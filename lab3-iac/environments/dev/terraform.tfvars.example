@@ -1,1 +1,23 @@
 # Ejemplo de valores de variables para dev (copiar a terraform.tfvars, no versionar el real)
+
+project_name = "lab3"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+azs                  = ["us-east-1a", "us-east-1b"]
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.0.0/24", "10.0.1.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+
+domain_zone_name = "midominio.com"   # <- reemplazar: hosted zone existente en Route53
+create_dns_zone  = false
+app_record_name  = "lab3.midominio.com" # <- reemplazar
+
+db_name     = "app"
+db_user     = "app_user"
+db_password = "CAMBIAR-ESTO" # <- no lo dejen commiteado en terraform.tfvars real
+
+github_repository_id = "maximocarbonetti/Teracloud-Lab3-Nico-Maxi" # <- confirmar owner/repo final
+github_branch         = "main"
+
+notification_emails = ["cragnocontact@gmail.com"] # <- agregar el de Maxi tambien
