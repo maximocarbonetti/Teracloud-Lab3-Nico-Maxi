@@ -11,6 +11,20 @@
 </head>
 <body>
 
+  <!-- Simbolos reutilizables (esquinas de filigrana y emblema de los libros) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="book-corner" viewBox="0 0 40 40">
+      <path d="M2,2 L2,14 C2,7 7,2 14,2 Z" />
+      <path d="M6,6 L6,11 C6,8 8,6 11,6 Z" opacity=".7" />
+      <circle cx="4" cy="4" r="1.6" />
+    </symbol>
+    <symbol id="book-emblem" viewBox="0 0 40 40">
+      <path d="M20,3 L28,12 L36,20 L28,28 L20,37 L12,28 L4,20 L12,12 Z" fill="none" stroke="currentColor" stroke-width="1.4" />
+      <path d="M20,10 L26,20 L20,30 L14,20 Z" fill="none" stroke="currentColor" stroke-width="1.2" />
+      <circle cx="20" cy="20" r="3" />
+    </symbol>
+  </svg>
+
   <!-- Cielo de Sovngarde: estrellas + cintas de aurora -->
   <div class="sky" aria-hidden="true">
     <div class="stars"></div>
@@ -37,65 +51,91 @@
         L700,384 L800,440 L900,396 L1010,450 L1110,388 L1220,442 L1320,400 L1430,448 L1540,404
         L1600,436 L1600,520 L0,520 Z" />
 
-      <!-- Gran salon nordico: techo escalonado con cabezas de dragon,
-           columnas talladas, escalinata y antorchas encendidas -->
+      <!-- Casa larga vikinga sobre pilotes: techo de paja que se curva
+           hacia arriba en las puntas, con cabezas de dragon talladas -->
       <g class="hall-ruin">
 
-        <!-- Resplandor calido detras del salon, para separarlo del fondo frio -->
-        <ellipse class="hall-glow" cx="800" cy="330" rx="260" ry="170" />
+        <!-- Resplandor calido detras de la casa, para separarla del fondo frio -->
+        <ellipse class="hall-glow" cx="800" cy="330" rx="300" ry="180" />
 
-        <!-- Techo en tres niveles escalonados, al estilo stavkirke -->
-        <path class="hall-roof hall-roof-3" d="M800,120 L866,196 L734,196 Z" />
-        <path class="hall-roof hall-roof-2" d="M800,168 L918,268 L682,268 Z" />
-        <path class="hall-roof hall-roof-1" d="M800,224 L1006,320 L594,320 Z" />
-        <rect class="hall-beam" x="580" y="318" width="440" height="16" />
+        <!-- Techo trasero (mas alto, se asoma detras del delantero) -->
+        <path class="thatch thatch-back"
+          d="M560,232 C600,176 900,150 916,196 C960,150 1030,176 1040,238
+             C1000,220 900,206 800,206 C700,206 620,218 560,232 Z" />
+        <path class="thatch-ridge thatch-ridge-back"
+          d="M580,224 C660,196 940,196 1020,230" />
 
-        <!-- Cabezas de dragon en cada remate del techo -->
-        <g class="dragon-head" transform="translate(800,120)">
+        <!-- Cabezas de dragon en las puntas del techo trasero -->
+        <g class="dragon-head" transform="translate(560,232) rotate(-18) scale(.85)">
           <path d="M0,0 C-4,-14 -16,-20 -26,-14 C-20,-10 -16,-6 -14,0
                    C-18,2 -22,8 -20,14 C-14,10 -8,8 -2,10 C4,12 6,4 0,0 Z" />
           <circle class="dragon-head-eye" cx="-16" cy="-9" r="1.6" />
         </g>
-        <g class="dragon-head dragon-head-side" transform="translate(734,196) scale(.82)">
-          <path d="M0,0 C-4,-14 -16,-20 -26,-14 C-20,-10 -16,-6 -14,0
-                   C-18,2 -22,8 -20,14 C-14,10 -8,8 -2,10 C4,12 6,4 0,0 Z" />
-          <circle class="dragon-head-eye" cx="-16" cy="-9" r="1.6" />
-        </g>
-        <g class="dragon-head dragon-head-side" transform="translate(866,196) scale(-.82,.82)">
+        <g class="dragon-head" transform="translate(1040,238) rotate(198) scale(-.85,.85)">
           <path d="M0,0 C-4,-14 -16,-20 -26,-14 C-20,-10 -16,-6 -14,0
                    C-18,2 -22,8 -20,14 C-14,10 -8,8 -2,10 C4,12 6,4 0,0 Z" />
           <circle class="dragon-head-eye" cx="-16" cy="-9" r="1.6" />
         </g>
 
-        <!-- Columnas talladas -->
-        <rect class="hall-col" x="612" y="332" width="30" height="140" />
-        <rect class="hall-col" x="684" y="332" width="30" height="140" />
-        <rect class="hall-col" x="756" y="332" width="30" height="140" />
-        <rect class="hall-col" x="814" y="332" width="30" height="140" />
-        <rect class="hall-col" x="886" y="332" width="30" height="140" />
-        <rect class="hall-col" x="958" y="332" width="30" height="140" />
-        <rect class="hall-col-cap" x="608" y="326" width="38" height="8" />
-        <rect class="hall-col-cap" x="680" y="326" width="38" height="8" />
-        <rect class="hall-col-cap" x="752" y="326" width="38" height="8" />
-        <rect class="hall-col-cap" x="810" y="326" width="38" height="8" />
-        <rect class="hall-col-cap" x="882" y="326" width="38" height="8" />
-        <rect class="hall-col-cap" x="954" y="326" width="38" height="8" />
+        <!-- Cuerpo de la casa, plataforma elevada -->
+        <rect class="hall-wall" x="606" y="286" width="388" height="84" rx="2" />
+        <rect class="hall-wall-band" x="606" y="286" width="388" height="10" />
+        <rect class="hall-platform" x="586" y="368" width="428" height="14" />
 
-        <!-- Arco de entrada, iluminado desde adentro -->
-        <path class="hall-arch" d="M778,472 L778,388 A22,22 0 0 1 822,388 L822,472 Z" />
+        <!-- Ventanas con luz calida -->
+        <rect class="hall-window" x="648" y="308" width="20" height="34" />
+        <rect class="hall-window" x="700" y="308" width="20" height="34" />
+        <rect class="hall-window" x="908" y="308" width="20" height="34" />
+        <rect class="hall-window" x="960" y="308" width="20" height="34" />
 
-        <!-- Escalinata -->
-        <rect class="hall-step" x="548" y="472" width="504" height="14" />
-        <rect class="hall-step" x="518" y="486" width="564" height="14" />
-        <rect class="hall-step" x="488" y="500" width="624" height="16" />
+        <!-- Puerta central, iluminada -->
+        <path class="hall-arch" d="M778,382 L778,320 A22,22 0 0 1 822,320 L822,382 Z" />
 
-        <!-- Antorchas encendidas a cada lado de la entrada -->
-        <g class="torch" transform="translate(748,420)">
-          <rect class="torch-pole" x="-3" y="0" width="6" height="52" />
+        <!-- Techo delantero: la gran ola de paja que se curva hacia el cielo -->
+        <path class="thatch thatch-front"
+          d="M498,300 C560,190 660,150 700,168 C720,140 880,140 900,168
+             C940,150 1040,190 1102,300
+             C1020,268 900,250 800,250 C700,250 580,268 498,300 Z" />
+        <path class="thatch-batten" d="M560,256 L560,204" />
+        <path class="thatch-batten" d="M640,246 L640,192" />
+        <path class="thatch-batten" d="M720,240 L720,178" />
+        <path class="thatch-batten" d="M800,238 L800,172" />
+        <path class="thatch-batten" d="M880,240 L880,178" />
+        <path class="thatch-batten" d="M960,246 L960,192" />
+        <path class="thatch-batten" d="M1040,256 L1040,204" />
+        <path class="thatch-ridge thatch-ridge-front"
+          d="M498,300 C620,258 980,258 1102,300" />
+
+        <!-- Cabezas de dragon en las puntas del techo delantero, mirando afuera -->
+        <g class="dragon-head" transform="translate(498,300) rotate(-30)">
+          <path d="M0,0 C-5,-17 -20,-24 -32,-17 C-25,-12 -20,-7 -17,0
+                   C-22,2 -27,10 -25,17 C-17,12 -10,10 -2,12 C5,15 7,5 0,0 Z" />
+          <circle class="dragon-head-eye" cx="-19" cy="-11" r="2" />
+        </g>
+        <g class="dragon-head" transform="translate(1102,300) rotate(210) scale(-1,1)">
+          <path d="M0,0 C-5,-17 -20,-24 -32,-17 C-25,-12 -20,-7 -17,0
+                   C-22,2 -27,10 -25,17 C-17,12 -10,10 -2,12 C5,15 7,5 0,0 Z" />
+          <circle class="dragon-head-eye" cx="-19" cy="-11" r="2" />
+        </g>
+
+        <!-- Pilotes que levantan la casa del suelo -->
+        <rect class="hall-stilt" x="616" y="382" width="16" height="118" transform="skewX(-3)" />
+        <rect class="hall-stilt" x="702" y="382" width="16" height="118" transform="skewX(-1)" />
+        <rect class="hall-stilt" x="882" y="382" width="16" height="118" transform="skewX(1)" />
+        <rect class="hall-stilt" x="968" y="382" width="16" height="118" transform="skewX(3)" />
+
+        <!-- Escalinata de acceso -->
+        <path class="hall-step" d="M748,500 L748,486 L852,486 L852,500 Z" />
+        <path class="hall-step" d="M736,486 L736,472 L864,472 L864,486 Z" />
+        <path class="hall-step" d="M724,472 L724,382 L876,382 L876,472 Z" opacity="0"/>
+
+        <!-- Antorchas encendidas a cada lado de la escalinata -->
+        <g class="torch" transform="translate(700,440)">
+          <rect class="torch-pole" x="-3" y="0" width="6" height="60" />
           <path class="torch-flame" d="M0,-22 C-9,-12 -9,2 0,-2 C9,2 9,-12 0,-22 Z" />
         </g>
-        <g class="torch" transform="translate(852,420)">
-          <rect class="torch-pole" x="-3" y="0" width="6" height="52" />
+        <g class="torch" transform="translate(900,440)">
+          <rect class="torch-pole" x="-3" y="0" width="6" height="60" />
           <path class="torch-flame" d="M0,-22 C-9,-12 -9,2 0,-2 C9,2 9,-12 0,-22 Z" />
         </g>
       </g>

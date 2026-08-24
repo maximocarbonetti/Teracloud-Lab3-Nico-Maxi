@@ -137,22 +137,47 @@ body {
   opacity: .62;
 }
 
-/* El gran salon: madera calida y hierro, para que se recorte con fuerza
-   contra el frio azul-verde de la cordillera y la aurora. */
-.hall-ruin { opacity: .92; }
+/* Casa larga vikinga sobre pilotes: paja calida y madera oscura, para que
+   se recorte con fuerza contra el frio azul-verde de la cordillera. */
+.hall-ruin { opacity: .95; }
 
 .hall-glow {
   fill: url(#hall-glow-grad);
+  opacity: .6;
+}
+
+/* Techo de paja: base solida + vetas repetidas para dar textura de fajos */
+.thatch {
+  fill: #c9a24a;
+  stroke: #7a5a1c;
+  stroke-width: 2;
+}
+.thatch-back { fill: #a9863c; opacity: .85; }
+
+.thatch-ridge {
+  fill: none;
+  stroke: #6b4d18;
+  stroke-width: 4;
+  stroke-linecap: round;
+  opacity: .7;
+}
+
+.thatch-batten {
+  stroke: #7a5a1c;
+  stroke-width: 2;
   opacity: .55;
 }
 
-.hall-roof   { fill: #4a2f18; stroke: #1c0f06; stroke-width: 1.5; }
-.hall-roof-2 { fill: #55371c; }
-.hall-roof-3 { fill: #603e20; }
+.hall-wall      { fill: #3b2413; }
+.hall-wall-band { fill: #241408; }
+.hall-platform  { fill: #241408; }
 
-.hall-beam    { fill: #2a1a0d; }
-.hall-col     { fill: #3b2515; }
-.hall-col-cap { fill: #2a1a0d; }
+.hall-window {
+  fill: var(--ember-lit);
+  opacity: .8;
+  filter: drop-shadow(0 0 6px rgba(240,185,92,.7));
+  animation: hall-flicker 4.2s ease-in-out infinite alternate;
+}
 
 .hall-arch {
   fill: var(--ember-lit);
@@ -161,10 +186,10 @@ body {
   animation: hall-flicker 3.4s ease-in-out infinite alternate;
 }
 
-.hall-step { fill: #22140a; }
+.hall-step  { fill: #22140a; }
+.hall-stilt { fill: #2a1a0d; }
 
 .dragon-head      { fill: #241408; }
-.dragon-head-side  { opacity: .92; }
 .dragon-head-eye  { fill: var(--ember-lit); }
 
 .torch-pole  { fill: #241408; }
@@ -575,9 +600,9 @@ body {
 /* Un tomo de la ronda: caja real con tapa, lomo y dos caras de paginas,
    asi tiene volumen desde cualquier angulo y nunca se reduce a una linea. */
 :root {
-  --book-w: 118px;  /* ancho de la tapa */
-  --book-h: 192px;  /* alto */
-  --book-d: 34px;   /* grosor */
+  --book-w: 122px;  /* ancho de la tapa */
+  --book-h: 196px;  /* alto */
+  --book-d: 44px;   /* grosor */
 }
 
 .rune-book {
@@ -591,17 +616,39 @@ body {
   transition: filter .3s ease;
 }
 
+/* Tapa de cuero con marco de filigrana dorada. Paleta propia para "mios"
+   (verde) y "de otros" (azul); ambas comparten el mismo tratamiento de oro. */
+:root {
+  --gold-lo:  #7a5a1c;
+  --gold:     #cf9f3f;
+  --gold-hi:  #f4d789;
+
+  --tome-face:  radial-gradient(120% 140% at 30% 15%, #2a5a3c 0%, #163d27 45%, #0d2818 100%);
+  --tome-edge:  #0a2015;
+}
+
+.rune-book.is-mine {
+  --tome-face: radial-gradient(120% 140% at 30% 15%, #2a5a3c 0%, #163d27 45%, #0d2818 100%);
+  --tome-edge: #0a2015;
+}
+
+.rune-book:not(.is-mine) {
+  --tome-face: radial-gradient(120% 140% at 30% 15%, #2f5a86 0%, #17324f 45%, #0c1e30 100%);
+  --tome-edge: #0a1826;
+}
+
 .rune-book .cover {
   position: absolute;
   inset: 0;
-  border-radius: 2px 4px 4px 2px;
-  background: linear-gradient(100deg, var(--leather-lo) 0 7%, var(--leather) 7% 100%);
+  border-radius: 3px 5px 5px 3px;
+  background: var(--tome-face);
   box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,.5),
-    inset -6px 0 12px rgba(0,0,0,.35),
-    0 10px 22px rgba(0,0,0,.55);
+    inset 0 0 0 1px rgba(0,0,0,.6),
+    inset 0 0 26px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 10px 24px rgba(0,0,0,.6);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   overflow: hidden;
   transform: translateZ(calc(var(--book-d) / 2));
@@ -609,68 +656,105 @@ body {
   backface-visibility: hidden;
 }
 
-.rune-book.is-mine .cover {
-  background: linear-gradient(100deg, var(--moss-lo) 0 7%, var(--moss-solid) 7% 100%);
+/* Doble filete dorado, como el repujado de una tapa de cuero real */
+.rune-book .cover::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border: 1.5px solid var(--gold);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.5),
+    inset 0 0 0 4px transparent,
+    inset 0 0 0 5px var(--gold-lo);
+  pointer-events: none;
 }
 
-/* Contratapa: cierra la caja del lado opuesto, mismo color mas oscuro */
+/* Cuatro esquinas de filigrana, una por vertice del marco */
+.rune-book .corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  fill: var(--gold);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.6));
+  opacity: .95;
+}
+.corner-tl { top: 6px;  left: 6px; }
+.corner-tr { top: 6px;  right: 6px;  transform: scaleX(-1); }
+.corner-bl { bottom: 6px; left: 6px;  transform: scaleY(-1); }
+.corner-br { bottom: 6px; right: 6px; transform: scale(-1,-1); }
+
+/* Emblema central, tipo escudo repujado */
+.rune-book .emblem {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  transform: translate(-50%, -50%);
+  fill: var(--gold);
+  stroke: var(--gold-hi);
+  filter: drop-shadow(0 0 5px rgba(0,0,0,.5));
+  opacity: .95;
+}
+
+/* Franja del lomo visible en la cara frontal (el "canto" de la encuadernacion) */
+.rune-book .spine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: linear-gradient(90deg, rgba(0,0,0,.55), transparent);
+  border-right: 1px solid rgba(212,159,63,.35);
+  transform: translateZ(calc(var(--book-d) / 2 + .5px));
+}
+
+/* Contratapa: cierra la caja del lado opuesto */
 .rune-book .back {
   position: absolute;
   inset: 0;
-  border-radius: 2px 4px 4px 2px;
-  background: var(--leather-lo);
+  border-radius: 3px 5px 5px 3px;
+  background: var(--tome-edge);
+  box-shadow: inset 0 0 20px rgba(0,0,0,.6);
   transform: rotateY(180deg) translateZ(calc(var(--book-d) / 2));
   backface-visibility: hidden;
 }
 
-.rune-book.is-mine .back { background: var(--moss-lo); }
-
 /* Canto de paginas: dos caras laterales que le dan volumen real al lomo,
-   asi el libro nunca se reduce a una linea al ponerse de canto. */
+   con capas para simular el borde curvo de las hojas apretadas. */
 .rune-book .pages {
   position: absolute;
-  top: 0;
+  top: 2px;
+  bottom: 2px;
   width: var(--book-d);
-  height: 100%;
-  background: repeating-linear-gradient(180deg, #d9cba8 0 2px, #b7a684 2px 3px);
-  box-shadow: inset 0 0 10px rgba(60,45,25,.4);
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.18) 0%, transparent 12% 88%, rgba(0,0,0,.18) 100%),
+    repeating-linear-gradient(180deg, #ebe0c4 0 2px, #cdbd95 2px 4px);
+  box-shadow: inset 0 0 12px rgba(60,45,25,.45);
 }
 
 .rune-book .pages-right {
   left: 100%;
   transform-origin: left center;
   transform: rotateY(90deg);
-  border-radius: 0 2px 2px 0;
+  border-radius: 0 3px 3px 0;
 }
 
 .rune-book .pages-left {
   right: 100%;
   transform-origin: right center;
   transform: rotateY(-90deg);
-  filter: brightness(.72); /* lado en sombra, hacia adentro de la ronda */
-  border-radius: 2px 0 0 2px;
+  filter: brightness(.68); /* lado en sombra, hacia adentro de la ronda */
+  border-radius: 3px 0 0 3px;
 }
 
 /* Emblema dorado del lomo */
-.rune-book .sigil {
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgba(240,185,92,.75);
-  transform: rotate(45deg);
-  box-shadow: inset 0 0 8px rgba(240,185,92,.35);
-}
-
-.rune-book .sigil::after {
-  content: "";
-  display: block;
-  width: 8px; height: 8px;
-  margin: 8px;
-  background: rgba(240,185,92,.85);
-}
-
 .rune-book .plate {
-  position: absolute;
-  left: 4px; right: 4px; bottom: 10px;
+  position: relative;
+  left: 0; right: 0;
+  margin: 0 6px 10px;
+  z-index: 1;
   text-align: center;
   font-family: "Cinzel", serif;
   color: rgba(240,220,180,.85);
