@@ -1,7 +1,7 @@
 {
-  "name": "lab2-anotador",
+  "name": "sovngarde-notes",
   "version": "1.0.0",
-  "description": "Anotador simple - Frontend Node.js conectado a MySQL (Laboratorio 2 - Teracloud Internship)",
+  "description": "Anotador con tematica nordica - Frontend Node.js conectado a MySQL (Laboratorio 3 - Teracloud Internship)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
