@@ -109,6 +109,21 @@ variable "db_password" {
   sensitive   = true
 }
 
+variable "mysql_data_path" {
+  description = <<-EOT
+    Directorio dentro del EFS donde MySQL guarda sus datos.
+
+    OJO: MySQL solo aplica MYSQL_USER / MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD la
+    primera vez que inicializa el datadir. Si se cambia la password despues de
+    que la base ya existe, las credenciales viejas siguen vigentes adentro y el
+    frontend falla con "Access denied for user". Cambiar este path a uno nuevo
+    fuerza a MySQL a inicializarse de cero con las credenciales actuales
+    (se pierden los datos que hubiera).
+  EOT
+  type        = string
+  default     = "/mysql"
+}
+
 # ---- CI/CD ----
 
 variable "github_repository_id" {

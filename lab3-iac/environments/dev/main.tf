@@ -3,13 +3,13 @@
 module "network" {
   source = "../../modules/network"
 
-  project_name         = var.project_name
-  environment          = var.environment
-  vpc_cidr             = var.vpc_cidr
-  azs                  = var.azs
-  public_subnet_cidrs  = var.public_subnet_cidrs
-  private_subnet_cidrs = var.private_subnet_cidrs
-  extra_tags           = local.common_tags
+  project_name          = var.project_name
+  environment           = var.environment
+  vpc_cidr              = var.vpc_cidr
+  azs                   = var.azs
+  public_subnet_cidrs   = var.public_subnet_cidrs
+  private_subnet_cidrs  = var.private_subnet_cidrs
+  extra_tags            = local.common_tags
 }
 
 module "security_groups" {
@@ -38,12 +38,12 @@ module "ecs_cluster" {
     module.security_groups.ecs_mysql_sg_id,
   ]
 
-  instance_type    = var.ecs_instance_type
-  min_size         = var.ecs_min_size
-  max_size         = var.ecs_max_size
-  desired_capacity = var.ecs_desired_capacity
-  key_name         = var.ec2_key_name
-  tags             = local.common_tags
+  instance_type     = var.ecs_instance_type
+  min_size          = var.ecs_min_size
+  max_size          = var.ecs_max_size
+  desired_capacity  = var.ecs_desired_capacity
+  key_name          = var.ec2_key_name
+  tags              = local.common_tags
 }
 
 # dns crea/busca la hosted zone (para acm) y, ademas, el record final que
@@ -70,12 +70,12 @@ module "acm" {
 module "alb" {
   source = "../../modules/alb"
 
-  name               = "${local.name_prefix}-alb"
-  vpc_id             = module.network.vpc_id
-  subnet_ids         = module.network.public_subnet_ids
-  security_group_ids = [module.security_groups.alb_sg_id]
-  certificate_arn    = module.acm.certificate_arn
-  tags               = local.common_tags
+  name                = "${local.name_prefix}-alb"
+  vpc_id              = module.network.vpc_id
+  subnet_ids          = module.network.public_subnet_ids
+  security_group_ids  = [module.security_groups.alb_sg_id]
+  certificate_arn     = module.acm.certificate_arn
+  tags                = local.common_tags
 }
 
 module "efs" {
@@ -84,6 +84,7 @@ module "efs" {
   name               = "${local.name_prefix}-mysql-data"
   subnet_ids         = module.network.private_subnet_ids
   security_group_ids = [module.security_groups.efs_sg_id]
+  access_point_path  = var.mysql_data_path
   tags               = local.common_tags
 }
 
@@ -154,27 +155,27 @@ module "notifications" {
 module "observability" {
   source = "../../modules/observability"
 
-  name_prefix           = local.name_prefix
-  cluster_name          = module.ecs_cluster.cluster_name
-  frontend_service_name = module.ecs_service.frontend_service_name
-  mysql_service_name    = module.ecs_service.mysql_service_name
-  alb_arn               = module.alb.alb_arn
-  target_group_arn      = module.alb.frontend_target_group_arn
-  sns_topic_arn         = module.notifications.topic_arn
-  tags                  = local.common_tags
+  name_prefix            = local.name_prefix
+  cluster_name           = module.ecs_cluster.cluster_name
+  frontend_service_name  = module.ecs_service.frontend_service_name
+  mysql_service_name     = module.ecs_service.mysql_service_name
+  alb_arn                = module.alb.alb_arn
+  target_group_arn       = module.alb.frontend_target_group_arn
+  sns_topic_arn          = module.notifications.topic_arn
+  tags                   = local.common_tags
 }
 
 module "cicd" {
   source = "../../modules/cicd"
 
-  name_prefix          = local.name_prefix
-  github_repository_id = var.github_repository_id
-  github_branch        = var.github_branch
-  ecr_repository_url   = module.ecr.repository_url
-  ecr_repository_arn   = module.ecr.repository_arn
-  ecs_cluster_name     = module.ecs_cluster.cluster_name
-  ecs_service_name     = module.ecs_service.frontend_service_name
-  container_name       = "frontend"
-  sns_topic_arn        = module.notifications.topic_arn
-  tags                 = local.common_tags
+  name_prefix           = local.name_prefix
+  github_repository_id  = var.github_repository_id
+  github_branch         = var.github_branch
+  ecr_repository_url    = module.ecr.repository_url
+  ecr_repository_arn    = module.ecr.repository_arn
+  ecs_cluster_name      = module.ecs_cluster.cluster_name
+  ecs_service_name      = module.ecs_service.frontend_service_name
+  container_name        = "frontend"
+  sns_topic_arn         = module.notifications.topic_arn
+  tags                  = local.common_tags
 }
