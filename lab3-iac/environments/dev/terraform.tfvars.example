@@ -20,4 +20,7 @@ db_password = "CAMBIAR-ESTO" # <- no lo dejen commiteado en terraform.tfvars rea
 github_repository_id = "maximocarbonetti/Teracloud-Lab3-Nico-Maxi" # <- confirmar owner/repo final
 github_branch         = "main"
 
-notification_emails = ["cragnocontact@gmail.com"] # <- agregar el de Maxi tambien
+notification_emails = [
+  "cragnocontact@gmail.com",
+  "maximocarbonetti2002@gmail.com",
+]
