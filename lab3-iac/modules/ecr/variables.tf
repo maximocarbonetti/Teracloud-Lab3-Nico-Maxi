@@ -6,9 +6,18 @@ variable "repository_name" {
 }
 
 variable "image_tag_mutability" {
-  description = "MUTABLE o IMMUTABLE"
+  description = <<-EOT
+    MUTABLE o IMMUTABLE.
+
+    Usamos MUTABLE a proposito: el pipeline publica cada imagen con un tag
+    versionado (el hash del commit) y ademas mueve el tag "latest" al ultimo
+    build. Con IMMUTABLE, "latest" no se podria reescribir nunca y ademas
+    fallaria cualquier re-ejecucion del pipeline sobre el mismo commit
+    ("tag invalid: ... cannot be overwritten because the tag is immutable").
+    El versionado real lo da el tag del commit, que nunca se reutiliza.
+  EOT
   type        = string
-  default     = "IMMUTABLE"
+  default     = "MUTABLE"
 }
 
 variable "scan_on_push" {
