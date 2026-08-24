@@ -6,6 +6,7 @@ const $ = (sel) => document.querySelector(sel);
 
 const els = {
   ring:        $('#ring'),
+  ringZoom:    $('#ring-zoom'),
   stageEmpty:  $('#stage-empty'),
   shelfMine:   $('#shelf-mine'),
   shelfOthers: $('#shelf-others'),
@@ -14,6 +15,7 @@ const els = {
   search:      $('#search'),
   searchHint:  $('#search-hint'),
   form:        $('#nota-form'),
+  titulo:      $('#titulo'),
   texto:       $('#texto'),
   status:      $('#status-msg'),
   reader:      $('#reader'),
@@ -99,9 +101,15 @@ function esMia(nota) {
          nota.autor.trim().toLowerCase() === viajero.trim().toLowerCase();
 }
 
-function titulo(nota) {
-  const limpio = (nota.texto || '').trim().replace(/\s+/g, ' ');
-  return limpio.length > 26 ? limpio.slice(0, 26) + '...' : limpio;
+// Titulo a mostrar. Las notas viejas (anteriores a la columna "titulo")
+// caen al primer fragmento del texto, para que nunca quede un lomo en blanco.
+function tituloDe(nota, max = 30) {
+  let t = (nota.titulo || '').trim();
+  if (!t || t === 'Tomo sin titulo') {
+    t = (nota.texto || '').trim().replace(/\s+/g, ' ');
+  }
+  t = t.replace(/\s+/g, ' ');
+  return t.length > max ? t.slice(0, max) + '...' : t;
 }
 
 /* ---------- Ronda de libros -------------------------------------------- */
@@ -114,9 +122,16 @@ function renderRonda() {
 
   if (!total) return;
 
-  // El radio crece con la cantidad para que los tomos no se solapen
-  const radio = Math.max(150, Math.round((total * 62) / (2 * Math.PI)));
+  // El radio crece con la cantidad para que los tomos no se solapen.
+  // 96px = ancho del lomo (84) + aire entre tomos.
+  const radio = Math.max(170, Math.round((total * 96) / (2 * Math.PI)));
   const paso = 360 / total;
+
+  // ...y la camara se aleja en la misma medida, para que la ronda entera
+  // siga entrando en pantalla en vez de comerse las estanterias.
+  const anchoDisponible = Math.min(els.ring.parentElement.parentElement.clientWidth || 560, 620);
+  const zoom = Math.min(1, Math.max(0.16, anchoDisponible / (radio * 2.25)));
+  els.ringZoom.style.setProperty('--ring-zoom', zoom.toFixed(3));
 
   notas.forEach((nota, i) => {
     const btn = document.createElement('button');
@@ -124,12 +139,15 @@ function renderRonda() {
     btn.className = 'rune-book' + (esMia(nota) ? ' is-mine' : '');
     btn.dataset.id = String(nota.id);
     btn.style.transform = `rotateY(${i * paso}deg) translateZ(${radio}px)`;
-    btn.setAttribute('aria-label', `Abrir el tomo de ${nota.autor}: ${titulo(nota)}`);
+    btn.setAttribute('aria-label', `Abrir el tomo "${tituloDe(nota)}" de ${nota.autor}`);
 
     btn.innerHTML = `
       <span class="cover">
         <span class="sigil"></span>
-        <span class="plate">${escapar(nota.autor)}</span>
+        <span class="plate">
+          <span class="plate-title">${escapar(tituloDe(nota, 34))}</span>
+          <span class="plate-author">${escapar(nota.autor)}</span>
+        </span>
       </span>`;
 
     btn.addEventListener('click', () => abrirTomo(nota));
@@ -168,8 +186,8 @@ function pintarEstante(contenedor, lista) {
     btn.type = 'button';
     btn.className = 'tome';
     btn.dataset.id = String(nota.id);
-    btn.textContent = titulo(nota);
-    btn.title = `${nota.autor} — ${formatFecha(nota.fecha_creacion)}`;
+    btn.textContent = tituloDe(nota, 32);
+    btn.title = `${tituloDe(nota, 80)} — ${nota.autor} — ${formatFecha(nota.fecha_creacion)}`;
     btn.addEventListener('click', () => abrirTomo(nota));
     contenedor.appendChild(btn);
   });
@@ -199,8 +217,9 @@ function aplicarBusqueda() {
   const idsCoinciden = new Set(
     notas
       .filter((n) =>
-        (n.texto || '').toLowerCase().includes(q) ||
-        (n.autor || '').toLowerCase().includes(q))
+        (n.titulo || '').toLowerCase().includes(q) ||
+        (n.texto  || '').toLowerCase().includes(q) ||
+        (n.autor  || '').toLowerCase().includes(q))
       .map((n) => String(n.id))
   );
 
@@ -228,6 +247,7 @@ function aplicarBusqueda() {
 /* ---------- Lector ------------------------------------------------------ */
 
 function abrirTomo(nota) {
+  els.reader.querySelector('.reader-tome-title').textContent = tituloDe(nota, 120);
   els.reader.querySelector('.reader-author').textContent = nota.autor || 'Viajero anonimo';
   els.reader.querySelector('.reader-date').textContent   = formatFecha(nota.fecha_creacion);
   els.reader.querySelector('.reader-id').textContent     = `Tomo n.º ${nota.id}`;
@@ -279,14 +299,15 @@ async function cargarNotas() {
 els.form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const texto = els.texto.value.trim();
-  if (!texto) return;
+  const texto  = els.texto.value.trim();
+  const titulo = els.titulo.value.trim();
+  if (!texto || !titulo) return;
 
   try {
     const res = await fetch('/api/notas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ texto, autor: viajero }),
+      body: JSON.stringify({ titulo, texto, autor: viajero }),
     });
 
     if (!res.ok) {
@@ -295,6 +316,7 @@ els.form.addEventListener('submit', async (e) => {
     }
 
     els.texto.value = '';
+    els.titulo.value = '';
     els.status.textContent = 'El tomo ya descansa en la biblioteca.';
     els.status.classList.add('is-good');
     els.status.classList.remove('is-error');
@@ -309,6 +331,13 @@ els.form.addEventListener('submit', async (e) => {
 });
 
 els.search.addEventListener('input', aplicarBusqueda);
+
+// El zoom depende del ancho disponible, asi que se recalcula al redimensionar
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderRonda, 180);
+});
 
 /* ---------- Arranque ---------------------------------------------------- */
 

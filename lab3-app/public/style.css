@@ -117,6 +117,36 @@ body {
   to   { transform: translateX(-6%) skewY(-3deg) scaleY(.92); }
 }
 
+.landscape {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: min(56vh, 520px);
+  display: block;
+}
+
+.range-far {
+  fill: #10222f;
+  opacity: .5;
+}
+
+.range-near {
+  fill: #0b1824;
+  opacity: .62;
+}
+
+/* El gran salon, apenas insinuado en el horizonte */
+.hall-ruin { opacity: .3; }
+
+.hall-roof  { fill: #16293a; }
+.hall-beam  { fill: #1b3145; }
+.hall-col   { fill: #16293a; }
+.hall-arch  { fill: #4fc9e8; opacity: .32; }
+.hall-step  { fill: #142635; }
+.hall-spire { fill: #1b3145; }
+
 .fog {
   position: absolute;
   inset: auto 0 0 0;
@@ -154,6 +184,7 @@ body {
   width: 190px;
   height: 95px;
   display: block;
+  transform: scaleX(-1); /* la cabeza mira hacia donde vuela */
   filter: drop-shadow(0 0 14px rgba(70, 227, 154, .35));
 }
 
@@ -336,6 +367,7 @@ body {
 
 .shelf {
   position: relative;
+  z-index: 6; /* por delante del anillo, que puede crecer y taparlas */
   padding: 1rem .8rem 2.2rem;
   border: 1px solid rgba(201,134,47,.28);
   border-radius: 3px;
@@ -452,6 +484,7 @@ body {
 
 .stage {
   position: relative;
+  z-index: 1; /* por detras de las estanterias */
   height: clamp(300px, 46vh, 420px);
   display: grid;
   place-items: center;
@@ -476,10 +509,19 @@ body {
   place-items: center;
 }
 
+/* Se aleja la camara a medida que la ronda crece, para que entre en pantalla.
+   El factor lo calcula app.js segun la cantidad de tomos. */
+.ring-zoom {
+  --ring-zoom: 1;
+  transform-style: preserve-3d;
+  transform: scale(var(--ring-zoom));
+  transition: transform .6s cubic-bezier(.2,.8,.2,1);
+}
+
 .ring {
   position: relative;
-  width: 60px;
-  height: 150px;
+  width: 84px;   /* lomos mas anchos, tipo tomo encuadernado */
+  height: 168px;
   transform-style: preserve-3d;
   animation: turn 44s linear infinite;
 }
@@ -553,13 +595,29 @@ body {
 
 .rune-book .plate {
   position: absolute;
-  left: 0; right: 0; bottom: 8px;
+  left: 4px; right: 4px; bottom: 10px;
   text-align: center;
   font-family: "Cinzel", serif;
-  font-size: .5rem;
-  letter-spacing: .08em;
-  color: rgba(240,220,180,.75);
-  padding: 0 4px;
+  color: rgba(240,220,180,.85);
+  overflow: hidden;
+}
+
+.rune-book .plate-title {
+  display: block;
+  font-size: .54rem;
+  line-height: 1.25;
+  letter-spacing: .04em;
+  max-height: 2.5em;
+  overflow: hidden;
+}
+
+.rune-book .plate-author {
+  display: block;
+  margin-top: 3px;
+  font-size: .44rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(240,220,180,.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -621,6 +679,23 @@ body {
 }
 
 .compose-form { display: grid; gap: .7rem; }
+
+.compose-title {
+  width: 100%;
+  padding: .6rem 1rem;
+  text-align: center;
+  color: #3a2f1d;
+  font-family: "Cinzel", serif;
+  font-size: .92rem;
+  letter-spacing: .06em;
+  border: 1px solid #2f1e12;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #f2e8cd, #e2d5b5);
+  box-shadow: inset 0 2px 8px rgba(90,70,40,.3), 0 8px 20px rgba(0,0,0,.4);
+}
+
+.compose-title::placeholder { color: #8b7a5c; font-style: italic; letter-spacing: .04em; }
+.compose-title:focus { outline: 2px solid var(--ember-lit); outline-offset: 3px; }
 
 #texto {
   width: 100%;
@@ -775,6 +850,17 @@ body {
   background: linear-gradient(90deg, rgba(60,40,20,.65), rgba(20,12,6,.85), rgba(60,40,20,.65));
 }
 
+.reader-tome-title {
+  margin: 0 0 1.1rem;
+  font-family: "Cinzel", serif;
+  font-size: clamp(1.15rem, 2.8vw, 1.6rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: #3a2214;
+  border-bottom: 1px solid rgba(120,95,60,.35);
+  padding-bottom: .7rem;
+}
+
 .reader-eyebrow {
   margin: 0 0 .3rem;
   font-family: "Cinzel", serif;
@@ -787,7 +873,7 @@ body {
 .reader-author {
   margin: 0 0 .9rem;
   font-family: "Cinzel", serif;
-  font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: .04em;
   color: #4a2e18;
@@ -905,6 +991,7 @@ body {
   .shelf-others { grid-area: others; }
   .shelf { min-height: 0; }
   .dragon { width: 130px; }
+  .landscape { height: 40vh; }
   .brand { text-align: center; }
   .brand-tag { margin-inline: auto; }
 }
@@ -917,5 +1004,6 @@ body {
     animation: none !important;
   }
   .reader-book { animation: fade-in .2s ease both; }
+  .ring-zoom { transition: none; }
   .dragon-flight { display: none; }
 }

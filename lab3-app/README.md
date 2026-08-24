@@ -51,22 +51,27 @@ target group del ALB.
 |--------|---------------|----------------------------------------------|
 | GET    | `/health`     | Devuelve 200 apenas el server HTTP esta arriba, aunque MySQL todavia no responda. Evita que el target group tumbe tasks sanas por un problema transitorio de la base. |
 | GET    | `/api/notas`  | Lista las notas, mas recientes primero        |
-| POST   | `/api/notas`  | Crea una nota. Body: `{ "texto": "...", "autor": "..." }` |
+| POST   | `/api/notas`  | Crea una nota. Body: `{ "titulo": "...", "texto": "...", "autor": "..." }` |
 
 ## Esquema
 
 ```sql
 CREATE TABLE notas (
   id             INT AUTO_INCREMENT PRIMARY KEY,
+  titulo         VARCHAR(120) NOT NULL DEFAULT 'Tomo sin titulo',
   texto          VARCHAR(1000) NOT NULL,
   autor          VARCHAR(80) NOT NULL DEFAULT 'Viajero anonimo',
   fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-La tabla se crea sola al arrancar. Si ya existia sin la columna `autor`,
-se agrega automaticamente con un `ALTER TABLE` (el error 1060 de columna
-duplicada se ignora, significa que la migracion ya se aplico).
+La tabla se crea sola al arrancar. Si ya existia sin las columnas `autor` o
+`titulo`, se agregan automaticamente con un `ALTER TABLE` (el error 1060 de
+columna duplicada se ignora: significa que la migracion ya se aplico).
+
+Las notas cargadas antes de que existiera `titulo` quedan con el valor por
+defecto; en pantalla el lomo muestra el primer fragmento del texto para que
+ningun tomo aparezca en blanco.
 
 ## Identidad del autor
 

@@ -17,6 +17,37 @@
     <div class="aurora aurora-1"></div>
     <div class="aurora aurora-2"></div>
     <div class="aurora aurora-3"></div>
+    <!-- Paisaje: montañas lejanas y el gran salon al fondo -->
+    <svg class="landscape" viewBox="0 0 1600 520" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+
+      <!-- Cordillera lejana -->
+      <path class="range range-far" d="M0,430 L90,318 L150,362 L232,268 L300,340 L372,244 L452,336 L520,300
+        L596,352 L668,286 L742,348 L820,262 L900,344 L972,302 L1048,356 L1120,276 L1200,340
+        L1274,296 L1352,354 L1428,290 L1510,346 L1600,300 L1600,520 L0,520 Z" />
+
+      <!-- Cordillera cercana -->
+      <path class="range range-near" d="M0,470 L120,392 L210,438 L310,360 L410,432 L500,398 L600,452
+        L700,384 L800,440 L900,396 L1010,450 L1110,388 L1220,442 L1320,400 L1430,448 L1540,404
+        L1600,436 L1600,520 L0,520 Z" />
+
+      <!-- Gran salon: escalinata, columnas, techo a dos aguas -->
+      <g class="hall-ruin">
+        <path class="hall-roof" d="M800,196 L992,318 L608,318 Z" />
+        <rect class="hall-beam" x="596" y="316" width="408" height="14" />
+        <rect class="hall-col" x="628" y="330" width="26" height="128" />
+        <rect class="hall-col" x="692" y="330" width="26" height="128" />
+        <rect class="hall-col" x="756" y="330" width="26" height="128" />
+        <rect class="hall-col" x="818" y="330" width="26" height="128" />
+        <rect class="hall-col" x="882" y="330" width="26" height="128" />
+        <rect class="hall-col" x="946" y="330" width="26" height="128" />
+        <path class="hall-arch" d="M786,458 L786,392 A14,14 0 0 1 814,392 L814,458 Z" />
+        <rect class="hall-step" x="566" y="458" width="468" height="12" />
+        <rect class="hall-step" x="540" y="470" width="520" height="12" />
+        <rect class="hall-step" x="514" y="482" width="572" height="14" />
+        <path class="hall-spire" d="M800,196 L806,168 L800,150 L794,168 Z" />
+      </g>
+    </svg>
+
     <div class="fog"></div>
   </div>
 
@@ -71,7 +102,7 @@
   <div class="search-wrap">
     <label class="search-label" for="search">Busca entre los tomos</label>
     <div class="search-field">
-      <input id="search" type="search" autocomplete="off" placeholder="Un titulo, un nombre, una palabra..." />
+      <input id="search" type="search" autocomplete="off" placeholder="Un titulo, un autor, una palabra..." />
     </div>
     <p class="search-hint" id="search-hint" aria-live="polite"></p>
   </div>
@@ -90,7 +121,9 @@
     <section class="stage" aria-label="Ronda de tomos">
       <div class="ring-floor"></div>
       <div class="ring-scene">
-        <div class="ring" id="ring"></div>
+        <div class="ring-zoom" id="ring-zoom">
+          <div class="ring" id="ring"></div>
+        </div>
       </div>
       <p class="stage-empty" id="stage-empty">La ronda esta vacia. Escribe el primer tomo.</p>
     </section>
@@ -108,6 +141,8 @@
   <section class="compose">
     <p class="compose-prompt">¿Que nota quieres escribir viajero?</p>
     <form id="nota-form" class="compose-form">
+      <input id="titulo" type="text" maxlength="120" required
+             class="compose-title" placeholder="Titulo del tomo" />
       <textarea id="texto" maxlength="1000" required
                 placeholder="Deja aqui tu relato..."></textarea>
       <button type="submit" class="compose-btn">Grabar el tomo</button>
@@ -145,8 +180,9 @@
     <div class="reader-veil" data-close></div>
     <div class="reader-book" role="dialog" aria-modal="true" aria-labelledby="reader-title">
       <div class="reader-page reader-page-left">
+        <h3 class="reader-tome-title" id="reader-title"></h3>
         <p class="reader-eyebrow">Escrito por</p>
-        <h3 class="reader-author" id="reader-title"></h3>
+        <p class="reader-author"></p>
         <p class="reader-date"></p>
         <p class="reader-id"></p>
       </div>

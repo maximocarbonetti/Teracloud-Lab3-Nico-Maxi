@@ -39,21 +39,27 @@ async function initDb() {
     await conn.query(`
       CREATE TABLE IF NOT EXISTS notas (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        titulo VARCHAR(120) NOT NULL DEFAULT 'Tomo sin titulo',
         texto VARCHAR(1000) NOT NULL,
         autor VARCHAR(80) NOT NULL DEFAULT 'Viajero anonimo',
         fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Migracion para bases creadas antes de que existiera la columna autor.
-    // El error 1060 (columna duplicada) significa que ya se aplico.
-    try {
-      await conn.query(
-        "ALTER TABLE notas ADD COLUMN autor VARCHAR(80) NOT NULL DEFAULT 'Viajero anonimo'"
-      );
-      console.log('[db] Columna "autor" agregada a una tabla preexistente.');
-    } catch (err) {
-      if (err.errno !== 1060) throw err;
+    // Migraciones para bases creadas antes de que existieran estas columnas.
+    // El error 1060 (columna duplicada) significa que ya se aplicaron.
+    const migraciones = [
+      ["autor",  "ALTER TABLE notas ADD COLUMN autor VARCHAR(80) NOT NULL DEFAULT 'Viajero anonimo'"],
+      ["titulo", "ALTER TABLE notas ADD COLUMN titulo VARCHAR(120) NOT NULL DEFAULT 'Tomo sin titulo'"],
+    ];
+
+    for (const [columna, sql] of migraciones) {
+      try {
+        await conn.query(sql);
+        console.log(`[db] Columna "${columna}" agregada a una tabla preexistente.`);
+      } catch (err) {
+        if (err.errno !== 1060) throw err;
+      }
     }
 
     conn.release();
@@ -87,7 +93,7 @@ app.get('/api/notas', async (req, res) => {
   }
   try {
     const [rows] = await pool.query(
-      'SELECT id, texto, autor, fecha_creacion FROM notas ORDER BY fecha_creacion DESC'
+      'SELECT id, titulo, texto, autor, fecha_creacion FROM notas ORDER BY fecha_creacion DESC'
     );
     res.json(rows);
   } catch (err) {
@@ -102,20 +108,26 @@ app.post('/api/notas', async (req, res) => {
     return res.status(503).json({ error: 'El salon todavia no abrio sus puertas. Reintentando conexion.' });
   }
 
-  const { texto, autor } = req.body;
+  const { titulo, texto, autor } = req.body;
 
   if (!texto || !texto.trim()) {
     return res.status(400).json({ error: 'Un tomo vacio no cuenta ninguna historia.' });
   }
 
   const nombreAutor = (autor || '').trim().slice(0, 80) || 'Viajero anonimo';
+  const tituloTomo  = (titulo || '').trim().slice(0, 120) || 'Tomo sin titulo';
 
   try {
     const [result] = await pool.query(
-      'INSERT INTO notas (texto, autor) VALUES (?, ?)',
-      [texto.trim(), nombreAutor]
+      'INSERT INTO notas (titulo, texto, autor) VALUES (?, ?, ?)',
+      [tituloTomo, texto.trim(), nombreAutor]
     );
-    res.status(201).json({ id: result.insertId, texto: texto.trim(), autor: nombreAutor });
+    res.status(201).json({
+      id: result.insertId,
+      titulo: tituloTomo,
+      texto: texto.trim(),
+      autor: nombreAutor,
+    });
   } catch (err) {
     console.error('[api] Error al crear nota:', err.message);
     res.status(500).json({ error: 'El tomo no pudo grabarse en la biblioteca.' });
