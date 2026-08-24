@@ -1,1 +1,4 @@
 # Archivos a excluir del build de Docker
+.git
+README.md
+buildspec.yml
