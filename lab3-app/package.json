@@ -1,0 +1,13 @@
+{
+  "name": "lab2-anotador",
+  "version": "1.0.0",
+  "description": "Anotador simple - Frontend Node.js conectado a MySQL (Laboratorio 2 - Teracloud Internship)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mysql2": "^3.11.0"
+  }
+}
