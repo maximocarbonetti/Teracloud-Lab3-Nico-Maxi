@@ -1,3 +1,7 @@
 provider "aws" {
-  region = "us-east-1" # TODO: mover a variable cuando se complete variables.tf de este entorno
+  region = var.aws_region
+
+  default_tags {
+    tags = local.common_tags
+  }
 }
