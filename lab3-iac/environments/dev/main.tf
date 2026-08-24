@@ -101,15 +101,20 @@ module "ssm_parameters" {
 module "ecs_service" {
   source = "../../modules/ecs-service"
 
+  # El servicio del frontend se registra en el target group del ALB, pero ese
+  # target group recien queda asociado a un load balancer cuando existe el
+  # listener. Sin este depends_on, en un despliegue desde cero Terraform puede
+  # crear el servicio antes que el listener y ECS rechaza el registro.
+  depends_on = [module.alb]
+
   name_prefix                = local.name_prefix
   cluster_id                 = module.ecs_cluster.cluster_id
-  cluster_name                = module.ecs_cluster.cluster_name
-  capacity_provider_name      = module.ecs_cluster.capacity_provider_name
-  vpc_id                      = module.network.vpc_id
-  private_dns_namespace_name  = local.private_dns_namespace_name
+  cluster_name               = module.ecs_cluster.cluster_name
+  vpc_id                     = module.network.vpc_id
+  private_dns_namespace_name = local.private_dns_namespace_name
 
-  frontend_image             = "${module.ecr.repository_url}:${var.frontend_image_tag}"
-  frontend_target_group_arn  = module.alb.frontend_target_group_arn
+  frontend_image            = "${module.ecr.repository_url}:${var.frontend_image_tag}"
+  frontend_target_group_arn = module.alb.frontend_target_group_arn
 
   frontend_secrets = {
     DB_HOST     = module.ssm_parameters.db_host_arn
@@ -119,9 +124,14 @@ module "ecs_service" {
     DB_PASSWORD = module.ssm_parameters.db_password_arn
   }
 
-  efs_file_system_id   = module.efs.file_system_id
-  efs_file_system_arn  = module.efs.file_system_arn
-  efs_access_point_id  = module.efs.access_point_id
+  # La task de mysql usa awsvpc network mode (requisito del A record en Cloud
+  # Map), asi que necesita sus propias subnets y security group para la ENI.
+  mysql_subnet_ids         = module.network.private_subnet_ids
+  mysql_security_group_ids = [module.security_groups.ecs_mysql_sg_id]
+
+  efs_file_system_id  = module.efs.file_system_id
+  efs_file_system_arn = module.efs.file_system_arn
+  efs_access_point_id = module.efs.access_point_id
 
   mysql_secrets = {
     MYSQL_ROOT_PASSWORD = module.ssm_parameters.db_password_arn

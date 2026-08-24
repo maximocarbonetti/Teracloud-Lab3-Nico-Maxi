@@ -28,6 +28,11 @@ resource "aws_route53_record" "app" {
   name    = var.record_name
   type    = "A"
 
+  # Toma el control del record aunque ya exista en la zona (por ejemplo, uno
+  # creado a mano antes de terraformar). Sin esto Route53 devuelve
+  # "InvalidChangeBatch: ... but it already exists".
+  allow_overwrite = true
+
   alias {
     name                   = var.alb_dns_name
     zone_id                = var.alb_zone_id

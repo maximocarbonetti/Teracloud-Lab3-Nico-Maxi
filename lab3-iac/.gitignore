@@ -2,4 +2,11 @@
 *.tfstate
 *.tfstate.*
 terraform.tfvars
-.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+
+# Nota: .terraform.lock.hcl NO se ignora a proposito. Hashicorp recomienda
+# versionarlo para que todos (y el CI) resuelvan exactamente las mismas
+# versiones de providers — es parte de que el repo sea reproducible.

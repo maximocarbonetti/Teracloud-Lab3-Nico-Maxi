@@ -55,6 +55,19 @@ variable "sns_topic_arn" {
   type        = string
 }
 
+variable "enable_pipeline_notifications" {
+  description = <<-EOT
+    Crea la notification rule del pipeline. La primera vez que se crea una en
+    una cuenta AWS nueva, el service-linked role de CodeStar Notifications
+    puede tardar hasta 15 minutos en existir y el apply falla con
+    "ConfigurationException: ... service-linked role ... might not yet exist".
+    Si pasa eso: volver a correr el apply mas tarde, o poner esto en false
+    para desbloquear el resto y activarlo despues.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

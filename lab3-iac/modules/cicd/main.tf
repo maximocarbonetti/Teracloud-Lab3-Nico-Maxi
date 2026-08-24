@@ -296,6 +296,8 @@ resource "aws_codepipeline" "this" {
 # Notificacion por email del estado del pipeline (succeeded/failed)
 # -----------------------------------------------------------------------------
 resource "aws_codestarnotifications_notification_rule" "pipeline" {
+  count = var.enable_pipeline_notifications ? 1 : 0
+
   name        = "${var.name_prefix}-pipeline-status"
   resource    = aws_codepipeline.this.arn
   detail_type = "FULL"

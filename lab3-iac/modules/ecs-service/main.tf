@@ -12,6 +12,11 @@ locals {
 # -----------------------------------------------------------------------------
 # Service discovery (Cloud Map) - namespace privado para que el frontend
 # resuelva "mysql.<namespace>" en vez de una IP fija.
+#
+# Los registros tipo A solo estan soportados cuando la task usa network mode
+# "awsvpc" (con "bridge"/"host" ECS exige SRV). Por eso la task de mysql usa
+# awsvpc y recibe su propia ENI en las subnets privadas; el frontend sigue en
+# bridge, que es lo que necesita para los puertos dinamicos del ALB.
 # -----------------------------------------------------------------------------
 resource "aws_service_discovery_private_dns_namespace" "this" {
   name = var.private_dns_namespace_name
@@ -206,7 +211,7 @@ resource "aws_ecs_service" "frontend" {
 # -----------------------------------------------------------------------------
 resource "aws_ecs_task_definition" "mysql" {
   family                   = "${var.name_prefix}-mysql"
-  network_mode             = "bridge"
+  network_mode             = "awsvpc" # requerido para registrar un A record en Cloud Map
   requires_compatibilities = ["EC2"]
   execution_role_arn       = aws_iam_role.execution.arn
   task_role_arn            = aws_iam_role.mysql_task.arn
@@ -233,10 +238,10 @@ resource "aws_ecs_task_definition" "mysql" {
       memory    = var.mysql_memory
       essential = true
 
+      # Con awsvpc el contenedor escucha en la ENI de la task, sin mapeo dinamico
       portMappings = [
         {
           containerPort = var.mysql_port
-          hostPort      = 0
           protocol      = "tcp"
         }
       ]
@@ -272,10 +277,16 @@ resource "aws_ecs_service" "mysql" {
   task_definition = aws_ecs_task_definition.mysql.arn
   desired_count   = 1
 
+  network_configuration {
+    subnets          = var.mysql_subnet_ids
+    security_groups  = var.mysql_security_group_ids
+    assign_public_ip = false
+  }
+
+  # Con awsvpc + A record NO se declaran container_name/container_port:
+  # Cloud Map registra directamente la IP privada de la ENI de la task.
   service_registries {
-    registry_arn   = aws_service_discovery_service.mysql.arn
-    container_name = "mysql"
-    container_port = var.mysql_port
+    registry_arn = aws_service_discovery_service.mysql.arn
   }
 
   # Una sola task: no hay problema de conflicto de puerto ni necesidad de spread

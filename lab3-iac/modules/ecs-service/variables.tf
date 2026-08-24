@@ -18,10 +18,9 @@ variable "cluster_name" {
   type = string
 }
 
-variable "capacity_provider_name" {
-  description = "Capacity provider del cluster (output del modulo ecs-cluster)"
-  type        = string
-}
+# Nota: no se recibe el capacity provider como input. El cluster ya define
+# una default_capacity_provider_strategy (ver modulo ecs-cluster), asi que
+# ambos servicios la heredan sin tener que declararla de nuevo aca.
 
 variable "vpc_id" {
   description = "VPC donde crear el namespace de service discovery"
@@ -98,6 +97,16 @@ variable "mysql_cpu" {
 variable "mysql_memory" {
   type    = number
   default = 1024
+}
+
+variable "mysql_subnet_ids" {
+  description = "Subnets privadas para la ENI de la task de mysql (usa awsvpc network mode)"
+  type        = list(string)
+}
+
+variable "mysql_security_group_ids" {
+  description = "Security groups para la ENI de la task de mysql (ecs_mysql_sg_id)"
+  type        = list(string)
 }
 
 variable "efs_file_system_id" {
