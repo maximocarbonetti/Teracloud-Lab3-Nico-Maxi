@@ -190,14 +190,23 @@ data "aws_iam_policy_document" "codepipeline_policy" {
     resources = [aws_codebuild_project.this.arn]
   }
 
+  # Permisos que la accion de deploy a ECS de CodePipeline necesita. Ojo con
+  # ecs:TagResource: hace falta porque nuestras task definitions llevan tags y
+  # la accion re-registra la task definition con la imagen nueva. Sin el, el
+  # deploy falla con "The provided role does not have sufficient permissions
+  # to access ECS".
   statement {
     effect = "Allow"
     actions = [
+      "ecs:DescribeClusters",
       "ecs:DescribeServices",
       "ecs:DescribeTaskDefinition",
       "ecs:DescribeTasks",
+      "ecs:ListServices",
+      "ecs:ListTaskDefinitions",
       "ecs:ListTasks",
       "ecs:RegisterTaskDefinition",
+      "ecs:TagResource",
       "ecs:UpdateService",
     ]
     resources = ["*"]
