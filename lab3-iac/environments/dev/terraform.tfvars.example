@@ -9,9 +9,9 @@ vpc_cidr             = "10.0.0.0/16"
 public_subnet_cidrs  = ["10.0.0.0/24", "10.0.1.0/24"]
 private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
 
-domain_zone_name = "midominio.com"   # <- reemplazar: hosted zone existente en Route53
+domain_zone_name = "maxicarbonetti.ownboarding.teratest.net" # <- confirmar que sea esta y no una mas corta
 create_dns_zone  = false
-app_record_name  = "lab3.midominio.com" # <- reemplazar
+app_record_name  = "alb.maxicarbonetti.ownboarding.teratest.net"
 
 db_name     = "app"
 db_user     = "app_user"
