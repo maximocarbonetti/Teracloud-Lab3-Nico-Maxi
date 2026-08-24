@@ -19,6 +19,13 @@
     <div class="aurora aurora-3"></div>
     <!-- Paisaje: montañas lejanas y el gran salon al fondo -->
     <svg class="landscape" viewBox="0 0 1600 520" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <defs>
+        <radialGradient id="hall-glow-grad" cx="50%" cy="55%" r="55%">
+          <stop offset="0%" stop-color="#f0b95c" stop-opacity=".9" />
+          <stop offset="55%" stop-color="#c9862f" stop-opacity=".35" />
+          <stop offset="100%" stop-color="#c9862f" stop-opacity="0" />
+        </radialGradient>
+      </defs>
 
       <!-- Cordillera lejana -->
       <path class="range range-far" d="M0,430 L90,318 L150,362 L232,268 L300,340 L372,244 L452,336 L520,300
@@ -30,21 +37,67 @@
         L700,384 L800,440 L900,396 L1010,450 L1110,388 L1220,442 L1320,400 L1430,448 L1540,404
         L1600,436 L1600,520 L0,520 Z" />
 
-      <!-- Gran salon: escalinata, columnas, techo a dos aguas -->
+      <!-- Gran salon nordico: techo escalonado con cabezas de dragon,
+           columnas talladas, escalinata y antorchas encendidas -->
       <g class="hall-ruin">
-        <path class="hall-roof" d="M800,196 L992,318 L608,318 Z" />
-        <rect class="hall-beam" x="596" y="316" width="408" height="14" />
-        <rect class="hall-col" x="628" y="330" width="26" height="128" />
-        <rect class="hall-col" x="692" y="330" width="26" height="128" />
-        <rect class="hall-col" x="756" y="330" width="26" height="128" />
-        <rect class="hall-col" x="818" y="330" width="26" height="128" />
-        <rect class="hall-col" x="882" y="330" width="26" height="128" />
-        <rect class="hall-col" x="946" y="330" width="26" height="128" />
-        <path class="hall-arch" d="M786,458 L786,392 A14,14 0 0 1 814,392 L814,458 Z" />
-        <rect class="hall-step" x="566" y="458" width="468" height="12" />
-        <rect class="hall-step" x="540" y="470" width="520" height="12" />
-        <rect class="hall-step" x="514" y="482" width="572" height="14" />
-        <path class="hall-spire" d="M800,196 L806,168 L800,150 L794,168 Z" />
+
+        <!-- Resplandor calido detras del salon, para separarlo del fondo frio -->
+        <ellipse class="hall-glow" cx="800" cy="330" rx="260" ry="170" />
+
+        <!-- Techo en tres niveles escalonados, al estilo stavkirke -->
+        <path class="hall-roof hall-roof-3" d="M800,120 L866,196 L734,196 Z" />
+        <path class="hall-roof hall-roof-2" d="M800,168 L918,268 L682,268 Z" />
+        <path class="hall-roof hall-roof-1" d="M800,224 L1006,320 L594,320 Z" />
+        <rect class="hall-beam" x="580" y="318" width="440" height="16" />
+
+        <!-- Cabezas de dragon en cada remate del techo -->
+        <g class="dragon-head" transform="translate(800,120)">
+          <path d="M0,0 C-4,-14 -16,-20 -26,-14 C-20,-10 -16,-6 -14,0
+                   C-18,2 -22,8 -20,14 C-14,10 -8,8 -2,10 C4,12 6,4 0,0 Z" />
+          <circle class="dragon-head-eye" cx="-16" cy="-9" r="1.6" />
+        </g>
+        <g class="dragon-head dragon-head-side" transform="translate(734,196) scale(.82)">
+          <path d="M0,0 C-4,-14 -16,-20 -26,-14 C-20,-10 -16,-6 -14,0
+                   C-18,2 -22,8 -20,14 C-14,10 -8,8 -2,10 C4,12 6,4 0,0 Z" />
+          <circle class="dragon-head-eye" cx="-16" cy="-9" r="1.6" />
+        </g>
+        <g class="dragon-head dragon-head-side" transform="translate(866,196) scale(-.82,.82)">
+          <path d="M0,0 C-4,-14 -16,-20 -26,-14 C-20,-10 -16,-6 -14,0
+                   C-18,2 -22,8 -20,14 C-14,10 -8,8 -2,10 C4,12 6,4 0,0 Z" />
+          <circle class="dragon-head-eye" cx="-16" cy="-9" r="1.6" />
+        </g>
+
+        <!-- Columnas talladas -->
+        <rect class="hall-col" x="612" y="332" width="30" height="140" />
+        <rect class="hall-col" x="684" y="332" width="30" height="140" />
+        <rect class="hall-col" x="756" y="332" width="30" height="140" />
+        <rect class="hall-col" x="814" y="332" width="30" height="140" />
+        <rect class="hall-col" x="886" y="332" width="30" height="140" />
+        <rect class="hall-col" x="958" y="332" width="30" height="140" />
+        <rect class="hall-col-cap" x="608" y="326" width="38" height="8" />
+        <rect class="hall-col-cap" x="680" y="326" width="38" height="8" />
+        <rect class="hall-col-cap" x="752" y="326" width="38" height="8" />
+        <rect class="hall-col-cap" x="810" y="326" width="38" height="8" />
+        <rect class="hall-col-cap" x="882" y="326" width="38" height="8" />
+        <rect class="hall-col-cap" x="954" y="326" width="38" height="8" />
+
+        <!-- Arco de entrada, iluminado desde adentro -->
+        <path class="hall-arch" d="M778,472 L778,388 A22,22 0 0 1 822,388 L822,472 Z" />
+
+        <!-- Escalinata -->
+        <rect class="hall-step" x="548" y="472" width="504" height="14" />
+        <rect class="hall-step" x="518" y="486" width="564" height="14" />
+        <rect class="hall-step" x="488" y="500" width="624" height="16" />
+
+        <!-- Antorchas encendidas a cada lado de la entrada -->
+        <g class="torch" transform="translate(748,420)">
+          <rect class="torch-pole" x="-3" y="0" width="6" height="52" />
+          <path class="torch-flame" d="M0,-22 C-9,-12 -9,2 0,-2 C9,2 9,-12 0,-22 Z" />
+        </g>
+        <g class="torch" transform="translate(852,420)">
+          <rect class="torch-pole" x="-3" y="0" width="6" height="52" />
+          <path class="torch-flame" d="M0,-22 C-9,-12 -9,2 0,-2 C9,2 9,-12 0,-22 Z" />
+        </g>
       </g>
     </svg>
 

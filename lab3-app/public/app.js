@@ -123,8 +123,8 @@ function renderRonda() {
   if (!total) return;
 
   // El radio crece con la cantidad para que los tomos no se solapen.
-  // 96px = ancho del lomo (84) + aire entre tomos.
-  const radio = Math.max(170, Math.round((total * 96) / (2 * Math.PI)));
+  // 130px = ancho de la tapa (118, ver --book-w en CSS) + aire entre tomos.
+  const radio = Math.max(190, Math.round((total * 130) / (2 * Math.PI)));
   const paso = 360 / total;
 
   // ...y la camara se aleja en la misma medida, para que la ronda entera
@@ -148,7 +148,10 @@ function renderRonda() {
           <span class="plate-title">${escapar(tituloDe(nota, 34))}</span>
           <span class="plate-author">${escapar(nota.autor)}</span>
         </span>
-      </span>`;
+      </span>
+      <span class="pages pages-right"></span>
+      <span class="pages pages-left"></span>
+      <span class="back"></span>`;
 
     btn.addEventListener('click', () => abrirTomo(nota));
     els.ring.appendChild(btn);

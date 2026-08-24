@@ -137,15 +137,54 @@ body {
   opacity: .62;
 }
 
-/* El gran salon, apenas insinuado en el horizonte */
-.hall-ruin { opacity: .3; }
+/* El gran salon: madera calida y hierro, para que se recorte con fuerza
+   contra el frio azul-verde de la cordillera y la aurora. */
+.hall-ruin { opacity: .92; }
 
-.hall-roof  { fill: #16293a; }
-.hall-beam  { fill: #1b3145; }
-.hall-col   { fill: #16293a; }
-.hall-arch  { fill: #4fc9e8; opacity: .32; }
-.hall-step  { fill: #142635; }
-.hall-spire { fill: #1b3145; }
+.hall-glow {
+  fill: url(#hall-glow-grad);
+  opacity: .55;
+}
+
+.hall-roof   { fill: #4a2f18; stroke: #1c0f06; stroke-width: 1.5; }
+.hall-roof-2 { fill: #55371c; }
+.hall-roof-3 { fill: #603e20; }
+
+.hall-beam    { fill: #2a1a0d; }
+.hall-col     { fill: #3b2515; }
+.hall-col-cap { fill: #2a1a0d; }
+
+.hall-arch {
+  fill: var(--ember-lit);
+  opacity: .55;
+  filter: drop-shadow(0 0 10px rgba(240,185,92,.6));
+  animation: hall-flicker 3.4s ease-in-out infinite alternate;
+}
+
+.hall-step { fill: #22140a; }
+
+.dragon-head      { fill: #241408; }
+.dragon-head-side  { opacity: .92; }
+.dragon-head-eye  { fill: var(--ember-lit); }
+
+.torch-pole  { fill: #241408; }
+.torch-flame {
+  fill: var(--ember-lit);
+  filter: drop-shadow(0 0 8px rgba(240,185,92,.85));
+  animation: torch-flicker 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes hall-flicker {
+  from { opacity: .42; }
+  to   { opacity: .68; }
+}
+
+@keyframes torch-flicker {
+  0%   { opacity: .8;  transform: scaleY(1)    translateY(0); }
+  40%  { opacity: 1;   transform: scaleY(1.08) translateY(-1px); }
+  70%  { opacity: .85; transform: scaleY(.96)  translateY(0); }
+  100% { opacity: 1;   transform: scaleY(1.05) translateY(-1px); }
+}
 
 .fog {
   position: absolute;
@@ -520,8 +559,8 @@ body {
 
 .ring {
   position: relative;
-  width: 84px;   /* lomos mas anchos, tipo tomo encuadernado */
-  height: 168px;
+  width: var(--book-w);
+  height: var(--book-h);
   transform-style: preserve-3d;
   animation: turn 44s linear infinite;
 }
@@ -533,7 +572,14 @@ body {
   to   { transform: rotateX(-9deg) rotateY(360deg); }
 }
 
-/* Un tomo de la ronda */
+/* Un tomo de la ronda: caja real con tapa, lomo y dos caras de paginas,
+   asi tiene volumen desde cualquier angulo y nunca se reduce a una linea. */
+:root {
+  --book-w: 118px;  /* ancho de la tapa */
+  --book-h: 192px;  /* alto */
+  --book-d: 34px;   /* grosor */
+}
+
 .rune-book {
   position: absolute;
   inset: 0;
@@ -558,28 +604,57 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  transform: translateZ(calc(var(--book-d) / 2));
   transition: transform .45s cubic-bezier(.2,.8,.2,1), box-shadow .45s ease;
+  backface-visibility: hidden;
 }
 
 .rune-book.is-mine .cover {
   background: linear-gradient(100deg, var(--moss-lo) 0 7%, var(--moss-solid) 7% 100%);
 }
 
-/* Cantos de las paginas */
-.rune-book .cover::after {
-  content: "";
+/* Contratapa: cierra la caja del lado opuesto, mismo color mas oscuro */
+.rune-book .back {
   position: absolute;
-  right: 0; top: 4px; bottom: 4px;
-  width: 5px;
-  background: repeating-linear-gradient(180deg,
-    #d9cba8 0 2px, #b7a684 2px 3px);
+  inset: 0;
+  border-radius: 2px 4px 4px 2px;
+  background: var(--leather-lo);
+  transform: rotateY(180deg) translateZ(calc(var(--book-d) / 2));
+  backface-visibility: hidden;
+}
+
+.rune-book.is-mine .back { background: var(--moss-lo); }
+
+/* Canto de paginas: dos caras laterales que le dan volumen real al lomo,
+   asi el libro nunca se reduce a una linea al ponerse de canto. */
+.rune-book .pages {
+  position: absolute;
+  top: 0;
+  width: var(--book-d);
+  height: 100%;
+  background: repeating-linear-gradient(180deg, #d9cba8 0 2px, #b7a684 2px 3px);
+  box-shadow: inset 0 0 10px rgba(60,45,25,.4);
+}
+
+.rune-book .pages-right {
+  left: 100%;
+  transform-origin: left center;
+  transform: rotateY(90deg);
   border-radius: 0 2px 2px 0;
+}
+
+.rune-book .pages-left {
+  right: 100%;
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+  filter: brightness(.72); /* lado en sombra, hacia adentro de la ronda */
+  border-radius: 2px 0 0 2px;
 }
 
 /* Emblema dorado del lomo */
 .rune-book .sigil {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border: 1px solid rgba(240,185,92,.75);
   transform: rotate(45deg);
   box-shadow: inset 0 0 8px rgba(240,185,92,.35);
@@ -625,14 +700,14 @@ body {
 
 .rune-book:hover .cover,
 .rune-book:focus-visible .cover {
-  transform: translateY(-14px) scale(1.06);
+  transform: translateZ(calc(var(--book-d) / 2)) translateY(-14px) scale(1.06);
   box-shadow: 0 0 26px rgba(240,185,92,.5), 0 14px 26px rgba(0,0,0,.6);
 }
 .rune-book:focus-visible { outline: none; }
 
 /* Resultado de busqueda: el tomo se eleva y brilla */
 .rune-book.is-hit .cover {
-  transform: translateY(-42px) scale(1.12);
+  transform: translateZ(calc(var(--book-d) / 2)) translateY(-42px) scale(1.12);
   box-shadow:
     0 0 34px 6px rgba(70,227,154,.55),
     0 0 70px 18px rgba(79,201,232,.28),
