@@ -8,8 +8,9 @@ task de MySQL, cuyo volumen vive en EFS.
 
 - Node.js 20 + Express (sirve la API y los archivos estaticos)
 - mysql2 para la conexion a la base
-- Frontend sin framework: HTML, CSS y JS plano. Todo el arte (aurora,
-  libros, dragon, cofre) es SVG/CSS original, sin assets externos.
+- Frontend sin framework: HTML, CSS y JS plano.
+- La ronda de tomos es una escena 3D con **three.js** (importado por CDN via
+  importmap) que carga los modelos GLB reales de los libros.
 
 ## Estructura
 

@@ -11,132 +11,13 @@
 </head>
 <body>
 
-  <!-- Simbolos reutilizables (esquinas de filigrana y emblema de los libros) -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <symbol id="book-corner" viewBox="0 0 40 40">
-      <path d="M2,2 L2,14 C2,7 7,2 14,2 Z" />
-      <path d="M6,6 L6,11 C6,8 8,6 11,6 Z" opacity=".7" />
-      <circle cx="4" cy="4" r="1.6" />
-    </symbol>
-    <symbol id="book-emblem" viewBox="0 0 40 40">
-      <path d="M20,3 L28,12 L36,20 L28,28 L20,37 L12,28 L4,20 L12,12 Z" fill="none" stroke="currentColor" stroke-width="1.4" />
-      <path d="M20,10 L26,20 L20,30 L14,20 Z" fill="none" stroke="currentColor" stroke-width="1.2" />
-      <circle cx="20" cy="20" r="3" />
-    </symbol>
-  </svg>
-
-  <!-- Cielo de Sovngarde: estrellas + cintas de aurora -->
+  <!-- Cielo de Sovngarde: foto de la aurora + capas animadas encima -->
   <div class="sky" aria-hidden="true">
+    <div class="bg-photo"></div>
     <div class="stars"></div>
     <div class="aurora aurora-1"></div>
     <div class="aurora aurora-2"></div>
     <div class="aurora aurora-3"></div>
-    <!-- Paisaje: montañas lejanas y el gran salon al fondo -->
-    <svg class="landscape" viewBox="0 0 1600 520" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-      <defs>
-        <radialGradient id="hall-glow-grad" cx="50%" cy="55%" r="55%">
-          <stop offset="0%" stop-color="#f0b95c" stop-opacity=".9" />
-          <stop offset="55%" stop-color="#c9862f" stop-opacity=".35" />
-          <stop offset="100%" stop-color="#c9862f" stop-opacity="0" />
-        </radialGradient>
-      </defs>
-
-      <!-- Cordillera lejana -->
-      <path class="range range-far" d="M0,430 L90,318 L150,362 L232,268 L300,340 L372,244 L452,336 L520,300
-        L596,352 L668,286 L742,348 L820,262 L900,344 L972,302 L1048,356 L1120,276 L1200,340
-        L1274,296 L1352,354 L1428,290 L1510,346 L1600,300 L1600,520 L0,520 Z" />
-
-      <!-- Cordillera cercana -->
-      <path class="range range-near" d="M0,470 L120,392 L210,438 L310,360 L410,432 L500,398 L600,452
-        L700,384 L800,440 L900,396 L1010,450 L1110,388 L1220,442 L1320,400 L1430,448 L1540,404
-        L1600,436 L1600,520 L0,520 Z" />
-
-      <!-- Casa larga nordica: base de piedra, entramado de madera,
-           porche con barriles y el gran techo de paja concavo cuyas puntas
-           se curvan hacia el cielo y rematan en madera tallada -->
-      <g class="hall-ruin">
-
-        <ellipse class="hall-glow" cx="800" cy="340" rx="330" ry="190" />
-
-        <!-- Pilotes y base de piedra -->
-        <path class="stone-base" d="M690,392 L1010,392 L1010,498 L690,498 Z" />
-        <path class="stone-arch" d="M818,498 L818,452 A20,20 0 0 1 858,452 L858,498 Z" />
-        <g class="stilt">
-          <path d="M1012,398 L1036,398 L1044,500 L1020,500 Z" />
-          <path d="M1010,420 L1044,470" class="stilt-brace" />
-        </g>
-        <g class="stilt">
-          <path d="M1064,404 L1088,404 L1094,500 L1070,500 Z" />
-        </g>
-        <rect class="stone-foot" x="1012" y="496" width="40" height="14" rx="3" />
-        <rect class="stone-foot" x="1064" y="496" width="36" height="14" rx="3" />
-
-        <!-- Cuerpo: muros con entramado -->
-        <rect class="hall-wall" x="672" y="300" width="392" height="96" />
-        <path class="timber" d="M700,300 L700,396 M772,300 L772,396 M844,300 L844,396
-                                M916,300 L916,396 M988,300 L988,396" />
-        <path class="timber" d="M672,344 L1064,344" />
-
-        <!-- Ventanas ojivales encendidas -->
-        <path class="hall-window" d="M714,384 L714,352 A9,9 0 0 1 732,352 L732,384 Z" />
-        <path class="hall-window" d="M786,384 L786,352 A9,9 0 0 1 804,352 L804,384 Z" />
-        <path class="hall-window" d="M930,384 L930,352 A9,9 0 0 1 948,352 L948,384 Z" />
-        <path class="hall-window" d="M1002,384 L1002,352 A9,9 0 0 1 1020,352 L1020,384 Z" />
-
-        <!-- Alero saliente sobre la entrada -->
-        <path class="eave-roof" d="M846,318 L968,318 L986,352 L828,352 Z" />
-        <path class="hall-window hall-door" d="M876,396 L876,356 A14,14 0 0 1 904,356 L904,396 Z" />
-
-        <!-- Porche lateral con baranda y barriles -->
-        <rect class="deck" x="524" y="396" width="180" height="12" />
-        <path class="rail" d="M528,396 L528,362 M566,396 L566,362 M604,396 L604,362
-                              M642,396 L642,362 M680,396 L680,362" />
-        <path class="rail" d="M524,366 L704,366" />
-        <g class="barrel">
-          <ellipse cx="556" cy="382" rx="17" ry="13" />
-          <ellipse cx="596" cy="382" rx="17" ry="13" />
-          <ellipse cx="636" cy="382" rx="17" ry="13" />
-        </g>
-        <!-- Escalera de acceso -->
-        <path class="stairs" d="M524,408 L620,408 L620,424 L560,424 L560,440
-                                L524,440 Z" />
-        <path class="stairs-step" d="M524,414 L610,414 M540,424 L610,424
-                                     M524,432 L560,432" />
-
-        <!-- Techo de paja: dos alas concavas que se curvan hacia arriba -->
-        <path class="thatch"
-          d="M470,258 C520,196 660,166 800,164 C940,166 1080,196 1130,258
-             C1090,286 1060,300 1042,318 C1000,286 900,268 800,268
-             C700,268 600,286 558,318 C540,300 510,286 470,258 Z" />
-        <!-- Remates de madera que suben en las puntas -->
-        <path class="finial" d="M470,258 C452,236 442,214 452,196
-                                L470,206 C466,222 470,240 484,252 Z" />
-        <path class="finial" d="M1130,258 C1148,236 1158,214 1148,196
-                                L1130,206 C1134,222 1130,240 1116,252 Z" />
-        <!-- Cumbrera y listones -->
-        <path class="thatch-ridge" d="M470,258 C600,206 1000,206 1130,258" />
-        <path class="thatch-batten" d="M560,262 L578,214 M660,250 L672,196
-                                       M800,246 L800,188 M940,250 L928,196
-                                       M1040,262 L1022,214" />
-
-        <!-- Dos picos triangulares que asoman del techo (buhardillas) -->
-        <path class="thatch dormer" d="M700,300 C712,254 726,236 742,232
-                                       C736,258 734,282 738,304 Z" />
-        <path class="thatch dormer" d="M868,300 C880,254 894,236 910,232
-                                       C904,258 902,282 906,304 Z" />
-
-        <!-- Antorchas -->
-        <g class="torch" transform="translate(668,414)">
-          <rect class="torch-pole" x="-3" y="0" width="6" height="60" />
-          <path class="torch-flame" d="M0,-20 C-8,-11 -8,2 0,-2 C8,2 8,-11 0,-20 Z" />
-        </g>
-        <g class="torch" transform="translate(1046,414)">
-          <rect class="torch-pole" x="-3" y="0" width="6" height="60" />
-          <path class="torch-flame" d="M0,-20 C-8,-11 -8,2 0,-2 C8,2 8,-11 0,-20 Z" />
-        </g>
-      </g>
-    </svg>
-
     <div class="fog"></div>
   </div>
 
@@ -169,7 +50,6 @@
         </g>
       </svg>
 
-      <!-- Cuerdas + estandarte colgado de la cola -->
       <div class="banner">
         <span class="banner-rope banner-rope-a"></span>
         <span class="banner-rope banner-rope-b"></span>
@@ -181,13 +61,11 @@
     </div>
   </div>
 
-  <!-- Nombre de la app -->
   <header class="brand">
     <h1 class="brand-name">Sovngarde<span>Notes</span></h1>
     <p class="brand-tag">El salon de los tomos recordados</p>
   </header>
 
-  <!-- Buscador -->
   <div class="search-wrap">
     <label class="search-label" for="search">Busca entre los tomos</label>
     <div class="search-field">
@@ -196,28 +74,21 @@
     <p class="search-hint" id="search-hint" aria-live="polite"></p>
   </div>
 
-  <!-- Escenario principal -->
   <main class="hall">
 
-    <!-- Biblioteca izquierda: mis notas -->
     <aside class="shelf shelf-mine">
       <h2 class="shelf-title">Tus tomos</h2>
       <div class="shelf-body" id="shelf-mine"></div>
       <p class="shelf-count" id="count-mine">0</p>
     </aside>
 
-    <!-- Ronda de libros -->
+    <!-- Ronda de tomos: escena 3D con los modelos GLB -->
     <section class="stage" aria-label="Ronda de tomos">
-      <div class="ring-floor"></div>
-      <div class="ring-scene">
-        <div class="ring-zoom" id="ring-zoom">
-          <div class="ring" id="ring"></div>
-        </div>
-      </div>
+      <canvas id="ring-canvas"></canvas>
       <p class="stage-empty" id="stage-empty">La ronda esta vacia. Escribe el primer tomo.</p>
+      <p class="stage-note" id="stage-note" aria-live="polite"></p>
     </section>
 
-    <!-- Biblioteca derecha: notas de otros -->
     <aside class="shelf shelf-others">
       <h2 class="shelf-title">Tomos de otros</h2>
       <div class="shelf-body" id="shelf-others"></div>
@@ -226,7 +97,6 @@
 
   </main>
 
-  <!-- Escritura -->
   <section class="compose">
     <p class="compose-prompt">¿Que nota quieres escribir viajero?</p>
     <form id="nota-form" class="compose-form">
@@ -239,7 +109,6 @@
     <p class="compose-status" id="status-msg" aria-live="polite"></p>
   </section>
 
-  <!-- Cofre con el enlace al repositorio -->
   <a class="chest" id="chest"
      href="https://github.com/maximocarbonetti/Teracloud-Lab3-Nico-Maxi"
      target="_blank" rel="noopener noreferrer"
@@ -264,7 +133,6 @@
     </svg>
   </a>
 
-  <!-- Libro abierto (modal) -->
   <div class="reader" id="reader" hidden>
     <div class="reader-veil" data-close></div>
     <div class="reader-book" role="dialog" aria-modal="true" aria-labelledby="reader-title">
@@ -283,7 +151,6 @@
     </div>
   </div>
 
-  <!-- Bienvenida: nombre del viajero -->
   <div class="gate" id="gate" hidden>
     <div class="gate-card">
       <h2>Antes de entrar al salon</h2>
@@ -296,6 +163,14 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
