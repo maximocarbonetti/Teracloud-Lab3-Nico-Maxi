@@ -374,15 +374,20 @@ function redimensionar() {
 const TAPA_ANCHO = 1.40;
 const TAPA_ALTO  = 1.60;
 
-/* Ajuste extra del modelo ajeno.
-   Las medidas dicen que las dos tapas quedan del mismo tamano, pero en
-   pantalla el tomo ajeno se sigue leyendo mas chico, asi que se lo agranda
-   directamente. Se puede probar otro valor en vivo agregando ?escala=1.6 a
-   la URL, sin redesplegar, y despues fijarlo aca. */
-const AJUSTE_OTROS = (() => {
-  const v = Number(new URLSearchParams(location.search).get('escala'));
-  return Number.isFinite(v) && v > 0 ? v : 1.45;
-})();
+const parametro = (nombre, porDefecto) => {
+  const v = Number(new URLSearchParams(location.search).get(nombre));
+  return Number.isFinite(v) && v > 0 ? v : porDefecto;
+};
+
+/* Cuanto se agranda el tomo ajeno. Las medidas dicen que las dos tapas
+   quedan iguales, pero en pantalla el ajeno se lee mas chico, asi que se
+   lo agranda a mano. Se puede probar otro valor con ?escala=1.9 */
+const AJUSTE_OTROS = parametro('escala', 1.8);
+
+/* Que porcion del tomo ocupa el area sensible al puntero.
+   Al agrandar el modelo, su caja crecio junto con el: esto la vuelve a
+   ajustar al libro visible sin tocar el tamano. Se prueba con ?hitbox=0.5 */
+const HITBOX_OTROS = parametro('hitbox', 1 / AJUSTE_OTROS);
 
 function normalizarModelo(gltfScene, ajuste = 1) {
   const contenedor = new THREE.Group();
@@ -440,7 +445,7 @@ async function cargarModelos() {
     console.log(`[tomo] ${nombre}: ancho ${t.x.toFixed(3)}  alto ${t.y.toFixed(3)}  grosor ${t.z.toFixed(3)}`);
   };
   medir(ring3d.modelos.mine, 'propio');
-  medir(ring3d.modelos.others, `ajeno (ajuste ${AJUSTE_OTROS})`);
+  medir(ring3d.modelos.others, `ajeno (escala ${AJUSTE_OTROS}, hitbox ${HITBOX_OTROS.toFixed(2)})`);
   window.__sovngarde = ring3d;
 }
 
@@ -480,12 +485,13 @@ function crearRotulo(nota, ancho, alto) {
 /* Clona la plantilla con materiales propios, para poder atenuar o iluminar
    un tomo sin afectar a los demas. */
 function instanciarTomo(nota) {
-  const plantilla = esMia(nota) ? ring3d.modelos.mine : ring3d.modelos.others;
-  const obj = plantilla.clone(true);
+  const propio = esMia(nota);
+  const plantilla = propio ? ring3d.modelos.mine : ring3d.modelos.others;
+  const modelo = plantilla.clone(true);
   const tam = plantilla.userData.tamano;
 
   const materiales = [];
-  obj.traverse((n) => {
+  modelo.traverse((n) => {
     if (n.isMesh) {
       n.material = n.material.clone();
       n.material.transparent = true;
@@ -497,29 +503,39 @@ function instanciarTomo(nota) {
     }
   });
 
-  const rotulo = crearRotulo(nota, tam.x, tam.y);
-  rotulo.position.z = tam.z / 2 + 0.012;
+  // Grupo externo SIN escala propia. El modelo va adentro con su escala,
+  // y el rotulo, el halo y la caja de colision cuelgan de aca, en tamano
+  // real. Antes eran hijos del modelo escalado y se multiplicaban dos
+  // veces: con el tomo ajeno agrandado quedaban al doble de tamano.
+  const obj = new THREE.Group();
+  obj.add(modelo);
+
+  // El area sensible se calcula aparte del tamano visual: al agrandar el
+  // modelo su caja crecio igual, y quedaba capturando el puntero mucho mas
+  // alla del libro.
+  const factorHit = propio ? 1 : HITBOX_OTROS;
+  const tamHit = tam.clone().multiplyScalar(factorHit);
+
+  const rotulo = crearRotulo(nota, tamHit.x, tamHit.y);
+  rotulo.position.z = tamHit.z / 2 + 0.012;
   obj.add(rotulo);
 
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({
     map: texturaHalo(), transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false,
   }));
-  halo.scale.setScalar(Math.max(tam.x, tam.y) * 2.4);
+  halo.scale.setScalar(Math.max(tamHit.x, tamHit.y) * 2.4);
   halo.visible = false;
   obj.add(halo);
 
-  // Caja de colision del tamano exacto del libro. Va suelta en la ronda
-  // (no como hija del tomo) para no heredar su escala, y es lo unico
-  // contra lo que se lanza el rayo del puntero: asi el area sensible no
-  // incluye el halo ni el rotulo, y ademas el calculo es 12 triangulos
-  // en vez de los 35.000 del modelo.
+  // Caja de colision: 12 triangulos, ajustada al libro visible. Va suelta
+  // en la ronda para no heredar transformaciones.
   const hit = new THREE.Mesh(
-    new THREE.BoxGeometry(tam.x, tam.y, tam.z),
+    new THREE.BoxGeometry(tamHit.x, tamHit.y, tamHit.z),
     new THREE.MeshBasicMaterial({ visible: false })
   );
 
-  return { obj, materiales, tam, halo, hit };
+  return { obj, materiales, tam: tamHit, halo, hit };
 }
 
 function construirRonda() {
@@ -555,7 +571,7 @@ function construirRonda() {
 
   if (!total) { encuadrarCamara(); return; }
 
-  const anchoTomo = ring3d.modelos.mine.userData.tamano.x * 1.35;
+  const anchoTomo = ring3d.modelos.mine.userData.tamano.x * 1.45;
   ring3d.radio = Math.max(2.2, (total * anchoTomo) / (2 * Math.PI));
 
   enRonda.forEach((nota, i) => {
