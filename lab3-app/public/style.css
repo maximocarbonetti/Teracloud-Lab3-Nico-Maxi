@@ -137,60 +137,64 @@ body {
   opacity: .62;
 }
 
-/* Casa larga vikinga sobre pilotes: paja calida y madera oscura, para que
-   se recorte con fuerza contra el frio azul-verde de la cordillera. */
+/* Casa larga nordica. Paja calida y maderas oscuras para que se recorte
+   contra el frio azul-verde de la cordillera. */
 .hall-ruin { opacity: .95; }
 
-.hall-glow {
-  fill: url(#hall-glow-grad);
-  opacity: .6;
-}
+.hall-glow { fill: url(#hall-glow-grad); opacity: .55; }
 
-/* Techo de paja: base solida + vetas repetidas para dar textura de fajos */
+/* Techo de paja */
 .thatch {
-  fill: #c9a24a;
-  stroke: #7a5a1c;
+  fill: #cda954;
+  stroke: #6d4f1a;
   stroke-width: 2;
 }
-.thatch-back { fill: #a9863c; opacity: .85; }
+.dormer { fill: #bd9744; }
 
 .thatch-ridge {
   fill: none;
-  stroke: #6b4d18;
-  stroke-width: 4;
+  stroke: #6d4f1a;
+  stroke-width: 5;
   stroke-linecap: round;
-  opacity: .7;
+  opacity: .75;
 }
 
 .thatch-batten {
-  stroke: #7a5a1c;
-  stroke-width: 2;
-  opacity: .55;
+  stroke: #7d5c20;
+  stroke-width: 2.5;
+  opacity: .5;
+  fill: none;
 }
 
-.hall-wall      { fill: #3b2413; }
-.hall-wall-band { fill: #241408; }
-.hall-platform  { fill: #241408; }
+.finial { fill: #4a2f16; stroke: #24140a; stroke-width: 1.5; }
 
+/* Estructura de madera */
+.hall-wall { fill: #4a2f18; }
+.timber    { stroke: #2a1a0d; stroke-width: 3; fill: none; opacity: .8; }
+.eave-roof { fill: #56381c; stroke: #24140a; stroke-width: 1.5; }
+
+.deck   { fill: #3b2513; }
+.rail   { stroke: #2f1d0f; stroke-width: 3; fill: none; }
+.stairs { fill: #3b2513; stroke: #24140a; stroke-width: 1.5; }
+.stairs-step { stroke: #24140a; stroke-width: 2; fill: none; opacity: .7; }
+.barrel { fill: #5a3a1c; stroke: #2a1a0d; stroke-width: 1.5; }
+
+/* Base de piedra y pilotes */
+.stone-base  { fill: #2b3440; stroke: #1a2129; stroke-width: 2; }
+.stone-arch  { fill: #0d1620; }
+.stone-foot  { fill: #2b3440; }
+.stilt       { fill: #3b2513; }
+.stilt-brace { stroke: #3b2513; stroke-width: 7; fill: none; stroke-linecap: round; }
+
+/* Luces */
 .hall-window {
   fill: var(--ember-lit);
-  opacity: .8;
-  filter: drop-shadow(0 0 6px rgba(240,185,92,.7));
+  opacity: .85;
+  filter: drop-shadow(0 0 7px rgba(240,185,92,.75));
   animation: hall-flicker 4.2s ease-in-out infinite alternate;
 }
 
-.hall-arch {
-  fill: var(--ember-lit);
-  opacity: .55;
-  filter: drop-shadow(0 0 10px rgba(240,185,92,.6));
-  animation: hall-flicker 3.4s ease-in-out infinite alternate;
-}
-
-.hall-step  { fill: #22140a; }
-.hall-stilt { fill: #2a1a0d; }
-
-.dragon-head      { fill: #241408; }
-.dragon-head-eye  { fill: var(--ember-lit); }
+.hall-door { opacity: .6; }
 
 .torch-pole  { fill: #241408; }
 .torch-flame {
@@ -600,9 +604,8 @@ body {
 /* Un tomo de la ronda: caja real con tapa, lomo y dos caras de paginas,
    asi tiene volumen desde cualquier angulo y nunca se reduce a una linea. */
 :root {
-  --book-w: 122px;  /* ancho de la tapa */
-  --book-h: 196px;  /* alto */
-  --book-d: 44px;   /* grosor */
+  --book-w: 168px;  /* ancho del tomo en la ronda */
+  --book-h: 176px;  /* alto, incluye el rotulo de abajo */
 }
 
 .rune-book {
@@ -616,195 +619,56 @@ body {
   transition: filter .3s ease;
 }
 
-/* Tapa de cuero con marco de filigrana dorada. Paleta propia para "mios"
-   (verde) y "de otros" (azul); ambas comparten el mismo tratamiento de oro. */
-:root {
-  --gold-lo:  #7a5a1c;
-  --gold:     #cf9f3f;
-  --gold-hi:  #f4d789;
+/* Tomos de la ronda.
+   Se usan las ilustraciones compradas (public/img/tome-*.png). Como son
+   renders en perspectiva 3/4 con su propia sombra, no se mapean sobre las
+   caras de un cubo (quedaria doble perspectiva): cada tomo es un billboard
+   que orbita en el anillo pero siempre encara a la camara. */
 
-  --tome-face:  radial-gradient(120% 140% at 30% 15%, #2a5a3c 0%, #163d27 45%, #0d2818 100%);
-  --tome-edge:  #0a2015;
-}
-
-.rune-book.is-mine {
-  --tome-face: radial-gradient(120% 140% at 30% 15%, #2a5a3c 0%, #163d27 45%, #0d2818 100%);
-  --tome-edge: #0a2015;
-}
-
-.rune-book:not(.is-mine) {
-  --tome-face: radial-gradient(120% 140% at 30% 15%, #2f5a86 0%, #17324f 45%, #0c1e30 100%);
-  --tome-edge: #0a1826;
-}
-
-.rune-book .cover {
+/* Contrarrotacion: cancela el giro del anillo. Misma duracion y curva que
+   la animacion "turn", en sentido inverso, asi ambas se anulan. */
+.bb-spin {
   position: absolute;
   inset: 0;
-  border-radius: 3px 5px 5px 3px;
-  background: var(--tome-face);
-  box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,.6),
-    inset 0 0 26px rgba(0,0,0,.5),
-    inset 0 1px 0 rgba(255,255,255,.06),
-    0 10px 24px rgba(0,0,0,.6);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  overflow: hidden;
-  transform: translateZ(calc(var(--book-d) / 2));
-  transition: transform .45s cubic-bezier(.2,.8,.2,1), box-shadow .45s ease;
-  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  animation: counter-turn 44s linear infinite;
 }
 
-/* Doble filete dorado, como el repujado de una tapa de cuero real */
-.rune-book .cover::before {
-  content: "";
+.ring.is-paused .bb-spin { animation-play-state: paused; }
+
+@keyframes counter-turn {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(-360deg); }
+}
+
+/* Compensa la posicion angular fija de cada tomo en la ronda */
+.bb-fix {
   position: absolute;
-  inset: 9px;
-  border: 1.5px solid var(--gold);
-  border-radius: 2px;
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,.5),
-    inset 0 0 0 4px transparent,
-    inset 0 0 0 5px var(--gold-lo);
-  pointer-events: none;
+  inset: 0;
+  transform-style: preserve-3d;
 }
 
-/* Cuatro esquinas de filigrana, una por vertice del marco */
-.rune-book .corner {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  fill: var(--gold);
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,.6));
-  opacity: .95;
-}
-.corner-tl { top: 6px;  left: 6px; }
-.corner-tr { top: 6px;  right: 6px;  transform: scaleX(-1); }
-.corner-bl { bottom: 6px; left: 6px;  transform: scaleY(-1); }
-.corner-br { bottom: 6px; right: 6px; transform: scale(-1,-1); }
-
-/* Emblema central, tipo escudo repujado */
-.rune-book .emblem {
-  position: absolute;
-  top: 34%;
-  left: 50%;
-  width: 46px;
-  height: 46px;
-  transform: translate(-50%, -50%);
-  fill: var(--gold);
-  stroke: var(--gold-hi);
-  filter: drop-shadow(0 0 5px rgba(0,0,0,.5));
-  opacity: .95;
-}
-
-/* Franja del lomo visible en la cara frontal (el "canto" de la encuadernacion) */
-.rune-book .spine {
+.tome-art {
   position: absolute;
   left: 0;
+  right: 0;
   top: 0;
-  bottom: 0;
-  width: 12px;
-  background: linear-gradient(90deg, rgba(0,0,0,.55), transparent);
-  border-right: 1px solid rgba(212,159,63,.35);
-  transform: translateZ(calc(var(--book-d) / 2 + .5px));
+  height: 78%;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: contain;
+  filter: drop-shadow(0 12px 16px rgba(0,0,0,.55));
+  transition: transform .45s cubic-bezier(.2,.8,.2,1), filter .45s ease;
 }
 
-/* Contratapa: cierra la caja del lado opuesto */
-.rune-book .back {
-  position: absolute;
-  inset: 0;
-  border-radius: 3px 5px 5px 3px;
-  background: var(--tome-edge);
-  box-shadow: inset 0 0 20px rgba(0,0,0,.6);
-  transform: rotateY(180deg) translateZ(calc(var(--book-d) / 2));
-  backface-visibility: hidden;
-}
+.rune-book.is-mine  .tome-art { background-image: url("img/tome-mine.png"); }
+.rune-book:not(.is-mine) .tome-art { background-image: url("img/tome-others.png"); }
 
-/* Canto de paginas: dos caras laterales que le dan volumen real al lomo,
-   con capas para simular el borde curvo de las hojas apretadas. */
-.rune-book .pages {
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  width: var(--book-d);
-  background:
-    linear-gradient(90deg, rgba(0,0,0,.18) 0%, transparent 12% 88%, rgba(0,0,0,.18) 100%),
-    repeating-linear-gradient(180deg, #ebe0c4 0 2px, #cdbd95 2px 4px);
-  box-shadow: inset 0 0 12px rgba(60,45,25,.45);
+.rune-book:hover .tome-art,
+.rune-book:focus-visible .tome-art {
+  transform: translateY(-12px) scale(1.07);
+  filter: drop-shadow(0 0 20px rgba(240,185,92,.6)) drop-shadow(0 14px 18px rgba(0,0,0,.6));
 }
-
-.rune-book .pages-right {
-  left: 100%;
-  transform-origin: left center;
-  transform: rotateY(90deg);
-  border-radius: 0 3px 3px 0;
-}
-
-.rune-book .pages-left {
-  right: 100%;
-  transform-origin: right center;
-  transform: rotateY(-90deg);
-  filter: brightness(.68); /* lado en sombra, hacia adentro de la ronda */
-  border-radius: 3px 0 0 3px;
-}
-
-/* Emblema dorado del lomo */
-.rune-book .plate {
-  position: relative;
-  left: 0; right: 0;
-  margin: 0 6px 10px;
-  z-index: 1;
-  text-align: center;
-  font-family: "Cinzel", serif;
-  color: rgba(240,220,180,.85);
-  overflow: hidden;
-}
-
-.rune-book .plate-title {
-  display: block;
-  font-size: .54rem;
-  line-height: 1.25;
-  letter-spacing: .04em;
-  max-height: 2.5em;
-  overflow: hidden;
-}
-
-.rune-book .plate-author {
-  display: block;
-  margin-top: 3px;
-  font-size: .44rem;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: rgba(240,220,180,.55);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.rune-book:hover .cover,
-.rune-book:focus-visible .cover {
-  transform: translateZ(calc(var(--book-d) / 2)) translateY(-14px) scale(1.06);
-  box-shadow: 0 0 26px rgba(240,185,92,.5), 0 14px 26px rgba(0,0,0,.6);
-}
-.rune-book:focus-visible { outline: none; }
-
-/* Resultado de busqueda: el tomo se eleva y brilla */
-.rune-book.is-hit .cover {
-  transform: translateZ(calc(var(--book-d) / 2)) translateY(-42px) scale(1.12);
-  box-shadow:
-    0 0 34px 6px rgba(70,227,154,.55),
-    0 0 70px 18px rgba(79,201,232,.28),
-    0 18px 30px rgba(0,0,0,.6);
-  animation: hover-glow 1.9s ease-in-out infinite alternate;
-}
-
-@keyframes hover-glow {
-  from { filter: brightness(1);    }
-  to   { filter: brightness(1.28); }
-}
-
-.rune-book.is-dim { filter: brightness(.4) saturate(.5); }
 
 .stage-empty {
   position: absolute;
@@ -1158,7 +1022,7 @@ body {
 /* ---------- Accesibilidad ----------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .ring, .aurora, .stars, .dragon-flight, .dragon-rig,
+  .ring, .bb-spin, .aurora, .stars, .dragon-flight, .dragon-rig,
   .banner-board, .wing-up, .wing-down, .rune-book.is-hit .cover {
     animation: none !important;
   }

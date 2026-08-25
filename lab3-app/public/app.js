@@ -123,8 +123,8 @@ function renderRonda() {
   if (!total) return;
 
   // El radio crece con la cantidad para que los tomos no se solapen.
-  // 134px = ancho de la tapa (122, ver --book-w en CSS) + aire entre tomos.
-  const radio = Math.max(195, Math.round((total * 134) / (2 * Math.PI)));
+  // 182px = ancho del tomo (168, ver --book-w en CSS) + aire entre tomos.
+  const radio = Math.max(210, Math.round((total * 182) / (2 * Math.PI)));
   const paso = 360 / total;
 
   // ...y la camara se aleja en la misma medida, para que la ronda entera
@@ -141,22 +141,19 @@ function renderRonda() {
     btn.style.transform = `rotateY(${i * paso}deg) translateZ(${radio}px)`;
     btn.setAttribute('aria-label', `Abrir el tomo "${tituloDe(nota)}" de ${nota.autor}`);
 
+    // El billboard se contrarrota para encarar siempre a la camara:
+    // .bb-spin cancela el giro continuo del anillo (via CSS) y .bb-fix
+    // cancela la posicion angular fija de este tomo.
     btn.innerHTML = `
-      <span class="cover">
-        <svg class="corner corner-tl"><use href="#book-corner"/></svg>
-        <svg class="corner corner-tr"><use href="#book-corner"/></svg>
-        <svg class="corner corner-br"><use href="#book-corner"/></svg>
-        <svg class="corner corner-bl"><use href="#book-corner"/></svg>
-        <svg class="emblem"><use href="#book-emblem"/></svg>
-        <span class="plate">
-          <span class="plate-title">${escapar(tituloDe(nota, 34))}</span>
-          <span class="plate-author">${escapar(nota.autor)}</span>
+      <span class="bb-spin">
+        <span class="bb-fix" style="transform: rotateY(${-i * paso}deg)">
+          <span class="tome-art"></span>
+          <span class="plate">
+            <span class="plate-title">${escapar(tituloDe(nota, 28))}</span>
+            <span class="plate-author">${escapar(nota.autor)}</span>
+          </span>
         </span>
-      </span>
-      <span class="spine"></span>
-      <span class="pages pages-right"></span>
-      <span class="pages pages-left"></span>
-      <span class="back"></span>`;
+      </span>`;
 
     btn.addEventListener('click', () => abrirTomo(nota));
     els.ring.appendChild(btn);
