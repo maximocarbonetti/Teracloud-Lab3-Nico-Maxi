@@ -9,6 +9,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { SavePass } from 'three/addons/postprocessing/SavePass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -412,6 +414,37 @@ function texturaEstrella() {
   return t;
 }
 
+/* El postprocesado descarta el canal alfa y deja el canvas opaco: se veia
+   un rectangulo negro detras de los libros, tapando el fondo de la pagina.
+   Este shader final toma el color ya procesado y le devuelve la
+   transparencia guardada antes del bloom. */
+const ShaderAlfa = {
+  uniforms: {
+    tDiffuse: { value: null },   // imagen con bloom y tono aplicados
+    tAlfa:    { value: null },   // copia previa, de donde sale el alfa
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform sampler2D tAlfa;
+    varying vec2 vUv;
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+      float alfa = texture2D(tAlfa, vUv).a;
+      // El bloom suma luz alrededor de los objetos: se deja que esa luz
+      // tambien aporte opacidad, si no el halo se corta de golpe en el borde.
+      float halo = clamp(max(max(color.r, color.g), color.b), 0.0, 1.0);
+      gl_FragColor = vec4(color.rgb, max(alfa, halo * 0.9));
+    }
+  `,
+};
+
 /* Cielo equirectangular sintetico: le da al oro de las tapas algo que
    reflejar. Sin esto los materiales PBR quedan planos, porque la escena
    solo tiene luces direccionales y nada alrededor. */
@@ -549,6 +582,8 @@ function initEscena() {
   ring3d.renderer.outputColorSpace = THREE.SRGBColorSpace;
   ring3d.renderer.toneMapping = THREE.ACESFilmicToneMapping;
   ring3d.renderer.toneMappingExposure = 1.15;
+  // Fondo transparente: detras del canvas se ve la foto de la aurora
+  ring3d.renderer.setClearColor(0x000000, 0);
 
   ring3d.scene = new THREE.Scene();
 
@@ -593,17 +628,33 @@ function initEscena() {
   // Bloom: hace que los destellos, los rayos y el oro tengan halo real.
   // Se puede apagar con ?bloom=0 si el equipo va justo de rendimiento.
   if (BLOOM) {
-    ring3d.composer = new EffectComposer(ring3d.renderer);
-    ring3d.composer.addPass(new RenderPass(ring3d.scene, ring3d.camera));
+    ring3d.renderer.setClearColor(0x000000, 0);
 
-    const bloom = new UnrealBloomPass(
+    ring3d.composer = new EffectComposer(ring3d.renderer);
+
+    const render = new RenderPass(ring3d.scene, ring3d.camera);
+    render.clearAlpha = 0;
+    ring3d.composer.addPass(render);
+
+    // Copia de la escena tal cual salio, para recuperar el alfa al final
+    const guardado = new SavePass();
+    ring3d.composer.addPass(guardado);
+
+    ring3d.composer.addPass(new UnrealBloomPass(
       new THREE.Vector2(1, 1),
       0.55,  // fuerza
       0.5,   // radio
       0.72   // umbral: solo lo mas brillante genera halo
-    );
-    ring3d.composer.addPass(bloom);
-    ring3d.composer.addPass(new OutputPass());
+    ));
+
+    const salidaTono = new OutputPass();
+    salidaTono.renderToScreen = false;
+    ring3d.composer.addPass(salidaTono);
+
+    const restaurarAlfa = new ShaderPass(ShaderAlfa);
+    restaurarAlfa.uniforms.tAlfa.value = guardado.renderTarget.texture;
+    restaurarAlfa.renderToScreen = true;
+    ring3d.composer.addPass(restaurarAlfa);
   }
 
   redimensionar();
