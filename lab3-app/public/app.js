@@ -12,6 +12,17 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const $ = (sel) => document.querySelector(sel);
 
+/* ---------- Perillas por URL -------------------------------------------
+   Se declaran al principio porque se usan en todo el modulo. Utiles para
+   ajustar en vivo sin volver a desplegar. */
+const parametro = (nombre, porDefecto) => {
+  const v = Number(new URLSearchParams(location.search).get(nombre));
+  return Number.isFinite(v) && v > 0 ? v : porDefecto;
+};
+
+const BLOOM = parametro('bloom', 1) > 0;   // ?bloom=0 apaga el postprocesado
+const AUDIO = parametro('audio', 1) > 0;   // ?audio=0 silencia la app
+
 const els = {
   canvas:      $('#ring-canvas'),
   stage:       $('.stage'),
@@ -61,36 +72,184 @@ function ctx() {
 const sinMovimiento = () =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* Dos hojas pasando: ruido blanco con envolventes cortas */
-function sonidoPagina() {
-  if (sinMovimiento()) return;
+/* Un poco de sala: impulso sintetico (ruido que decae) para el convolver.
+   Da la sensacion de que el libro se abre dentro de un salon de piedra. */
+let impulso = null;
+
+function reverb(ac) {
+  if (impulso) return impulso;
+  const dur = 1.9, rate = ac.sampleRate;
+  const n = Math.floor(rate * dur);
+  const buf = ac.createBuffer(2, n, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.6) * 0.5;
+    }
+  }
+  impulso = buf;
+  return buf;
+}
+
+/* Nodo de entrada que reparte entre seco y reverberado */
+function salida(ac, humedo = 0.24) {
+  const entrada = ac.createGain();
+
+  const seco = ac.createGain();
+  seco.gain.value = 1 - humedo;
+  entrada.connect(seco).connect(ac.destination);
+
+  const conv = ac.createConvolver();
+  conv.buffer = reverb(ac);
+  const seco2 = ac.createGain();
+  seco2.gain.value = humedo;
+  entrada.connect(conv).connect(seco2).connect(ac.destination);
+
+  return entrada;
+}
+
+/* Fuente de ruido con la envolvente que se le pase */
+function ruido(ac, dur, envolvente) {
+  const rate = ac.sampleRate;
+  const n = Math.floor(rate * dur);
+  const buf = ac.createBuffer(1, n, rate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * envolvente(i / n);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  return src;
+}
+
+/* Abrir un tomo pesado. Tres capas superpuestas:
+   1. el golpe grave de la tapa al caer
+   2. el crujido del cuero de la encuadernacion, irregular
+   3. las hojas asentandose, en rafagas escalonadas */
+function sonidoAbrirLibro() {
+  if (sinMovimiento() || !AUDIO) return;
   try {
     const ac = ctx();
-    const dur = 0.42, rate = ac.sampleRate;
-    const frames = Math.floor(rate * dur);
-    const buf = ac.createBuffer(1, frames, rate);
-    const data = buf.getChannelData(0);
+    const out = salida(ac, 0.26);
+    const t0 = ac.currentTime;
 
-    for (let i = 0; i < frames; i++) {
-      const t = i / frames;
+    // --- 1. Golpe de la tapa: tono grave que cae ---
+    const golpe = ac.createOscillator();
+    golpe.type = 'sine';
+    golpe.frequency.setValueAtTime(125, t0);
+    golpe.frequency.exponentialRampToValueAtTime(50, t0 + 0.19);
+    const gGolpe = ac.createGain();
+    gGolpe.gain.setValueAtTime(0.0001, t0);
+    gGolpe.gain.exponentialRampToValueAtTime(0.42, t0 + 0.012);
+    gGolpe.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+    golpe.connect(gGolpe).connect(out);
+    golpe.start(t0);
+    golpe.stop(t0 + 0.34);
+
+    // cuerpo del golpe: ruido grave que le da peso
+    const cuerpo = ruido(ac, 0.3, (t) => Math.exp(-11 * t));
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 240;
+    const gCuerpo = ac.createGain();
+    gCuerpo.gain.value = 0.45;
+    cuerpo.connect(lp).connect(gCuerpo).connect(out);
+    cuerpo.start(t0);
+
+    // --- 2. Crujido del cuero ---
+    // La envolvente lleva "granos" al azar: es lo que hace que suene a
+    // material tensandose y no a un simple soplido.
+    const crujido = ruido(ac, 0.6, (t) => {
+      const env = Math.exp(-4.2 * t) * (t < 0.05 ? t / 0.05 : 1);
+      const grano = Math.random() < 0.38 ? 1 : 0.22;
+      return env * grano;
+    });
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 4.5;
+    bp.frequency.setValueAtTime(420, t0 + 0.02);
+    bp.frequency.exponentialRampToValueAtTime(1180, t0 + 0.52);
+    const gCrujido = ac.createGain();
+    gCrujido.gain.value = 0.3;
+    crujido.connect(bp).connect(gCrujido).connect(out);
+    crujido.start(t0 + 0.02);
+
+    // --- 3. Hojas asentandose ---
+    [0.10, 0.25, 0.4].forEach((desfase, i) => {
+      const hoja = ruido(ac, 0.32, (t) => Math.exp(-15 * t));
+      const hp = ac.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 1500;
+      const color = ac.createBiquadFilter();
+      color.type = 'bandpass';
+      color.frequency.value = 3000 + i * 750;
+      color.Q.value = 0.8;
+      const g = ac.createGain();
+      g.gain.value = 0.2 - i * 0.045;
+      hoja.connect(hp).connect(color).connect(g).connect(out);
+      hoja.start(t0 + desfase);
+    });
+  } catch { /* si el navegador bloquea el audio, la app sigue */ }
+}
+
+/* Cerrar el tomo: golpe mas seco y corto, sin crujido */
+function sonidoCerrarLibro() {
+  if (sinMovimiento() || !AUDIO) return;
+  try {
+    const ac = ctx();
+    const out = salida(ac, 0.2);
+    const t0 = ac.currentTime;
+
+    const golpe = ac.createOscillator();
+    golpe.type = 'sine';
+    golpe.frequency.setValueAtTime(105, t0);
+    golpe.frequency.exponentialRampToValueAtTime(45, t0 + 0.14);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.34, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.24);
+    golpe.connect(g).connect(out);
+    golpe.start(t0);
+    golpe.stop(t0 + 0.26);
+
+    const aire = ruido(ac, 0.22, (t) => Math.exp(-13 * t));
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 900;
+    const ga = ac.createGain();
+    ga.gain.value = 0.26;
+    aire.connect(lp).connect(ga).connect(out);
+    aire.start(t0);
+  } catch { /* idem */ }
+}
+
+/* Hoja pasando: sonido corto, para cuando se graba una nota */
+function sonidoPagina() {
+  if (sinMovimiento() || !AUDIO) return;
+  try {
+    const ac = ctx();
+    const out = salida(ac, 0.18);
+    const hoja = ruido(ac, 0.42, (t) => {
       const a = Math.exp(-14 * t);
       const b = t > 0.34 ? Math.exp(-16 * (t - 0.34)) * 0.75 : 0;
-      data[i] = (Math.random() * 2 - 1) * (a + b) * 0.5;
-    }
-
-    const src = ac.createBufferSource(); src.buffer = buf;
-    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.7;
-    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900;
-    const vol = ac.createGain(); vol.gain.value = 0.16;
-
-    src.connect(bp).connect(hp).connect(vol).connect(ac.destination);
-    src.start();
-  } catch { /* si el navegador bloquea el audio, la app sigue */ }
+      return (a + b) * 0.5;
+    });
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2600;
+    bp.Q.value = 0.7;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 900;
+    const vol = ac.createGain();
+    vol.gain.value = 0.18;
+    hoja.connect(bp).connect(hp).connect(vol).connect(out);
+    hoja.start();
+  } catch { /* idem */ }
 }
 
 /* Rugido del dragon: ruido grave con el filtro cayendo */
 function rugido() {
-  if (sinMovimiento()) return;
+  if (sinMovimiento() || !AUDIO) return;
   try {
     const ac = ctx();
     const dur = 0.9, rate = ac.sampleRate;
@@ -179,7 +338,6 @@ const ring3d = {
   zoom: 1,
 };
 
-const BLOOM = parametro('bloom', 1) > 0;
 
 /* ---------- Texturas generadas al vuelo -------------------------------- */
 
@@ -480,11 +638,6 @@ function redimensionar() {
    pasa a ser Z, asi la tapa mira hacia afuera de la ronda. */
 const TAPA_ANCHO = 1.40;
 const TAPA_ALTO  = 1.60;
-
-const parametro = (nombre, porDefecto) => {
-  const v = Number(new URLSearchParams(location.search).get(nombre));
-  return Number.isFinite(v) && v > 0 ? v : porDefecto;
-};
 
 /* Cuanto se agranda el tomo ajeno. Las medidas dicen que las dos tapas
    quedan iguales, pero en pantalla el ajeno se lee mas chico, asi que se
@@ -1057,11 +1210,15 @@ function abrirTomo(nota) {
   }
 
   els.reader.hidden = false;
-  sonidoPagina();
+  sonidoAbrirLibro();
   els.reader.querySelector('.reader-close').focus();
 }
 
-function cerrarTomo() { els.reader.hidden = true; }
+function cerrarTomo() {
+  if (els.reader.hidden) return;
+  els.reader.hidden = true;
+  sonidoCerrarLibro();
+}
 
 /* Confirmacion en dos pasos dentro del mismo boton, para no sacar al
    lector de la escena con un dialogo del navegador. */
