@@ -44,20 +44,28 @@ function guardarViajero(nombre) {
   try { localStorage.setItem('sovngarde:viajero', nombre); } catch { /* modo privado */ }
 }
 
-/* ---------- Sonido de paginas ------------------------------------------ */
+/* ---------- Audio sintetizado ------------------------------------------ */
 
 let audioCtx = null;
 
-function sonidoPagina() {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+function ctx() {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
 
-    const dur = 0.42, rate = audioCtx.sampleRate;
+const sinMovimiento = () =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Dos hojas pasando: ruido blanco con envolventes cortas */
+function sonidoPagina() {
+  if (sinMovimiento()) return;
+  try {
+    const ac = ctx();
+    const dur = 0.42, rate = ac.sampleRate;
     const frames = Math.floor(rate * dur);
-    const buffer = audioCtx.createBuffer(1, frames, rate);
-    const data = buffer.getChannelData(0);
+    const buf = ac.createBuffer(1, frames, rate);
+    const data = buf.getChannelData(0);
 
     for (let i = 0; i < frames; i++) {
       const t = i / frames;
@@ -66,18 +74,40 @@ function sonidoPagina() {
       data[i] = (Math.random() * 2 - 1) * (a + b) * 0.5;
     }
 
-    const src = audioCtx.createBufferSource();
-    src.buffer = buffer;
-    const bp = audioCtx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.7;
-    const hp = audioCtx.createBiquadFilter();
-    hp.type = 'highpass'; hp.frequency.value = 900;
-    const vol = audioCtx.createGain();
-    vol.gain.value = 0.16;
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.7;
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900;
+    const vol = ac.createGain(); vol.gain.value = 0.16;
 
-    src.connect(bp).connect(hp).connect(vol).connect(audioCtx.destination);
+    src.connect(bp).connect(hp).connect(vol).connect(ac.destination);
     src.start();
   } catch { /* si el navegador bloquea el audio, la app sigue */ }
+}
+
+/* Rugido del dragon: ruido grave con el filtro cayendo */
+function rugido() {
+  if (sinMovimiento()) return;
+  try {
+    const ac = ctx();
+    const dur = 0.9, rate = ac.sampleRate;
+    const frames = Math.floor(rate * dur);
+    const buf = ac.createBuffer(1, frames, rate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < frames; i++) {
+      const t = i / frames;
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-3.2 * t) * (1 - t * 0.3);
+    }
+
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(900, ac.currentTime);
+    lp.frequency.exponentialRampToValueAtTime(260, ac.currentTime + dur);
+    const vol = ac.createGain(); vol.gain.value = 0.2;
+
+    src.connect(lp).connect(vol).connect(ac.destination);
+    src.start();
+  } catch { /* idem */ }
 }
 
 /* ---------- Utilidades -------------------------------------------------- */
@@ -99,12 +129,6 @@ function tituloDe(nota, max = 30) {
   return t.length > max ? t.slice(0, max) + '...' : t;
 }
 
-function escapar(str) {
-  const d = document.createElement('div');
-  d.textContent = str == null ? '' : String(str);
-  return d.innerHTML;
-}
-
 /* =========================================================================
    Escena 3D de la ronda
    ========================================================================= */
@@ -114,25 +138,181 @@ const MAX_EN_RONDA = 40; // limite por performance; el resto vive en las estante
 const ring3d = {
   ok: false,
   scene: null, camera: null, renderer: null,
-  grupo: null,          // gira sobre su eje Y
-  modelos: {},          // plantillas GLB ya normalizadas
-  tomos: [],            // { nota, obj, materiales, alturaBase }
+  grupo: null,
+  modelos: {},
+  tomos: [],
   raycaster: new THREE.Raycaster(),
   puntero: new THREE.Vector2(),
+  punteroSucio: false,
   reloj: new THREE.Clock(),
   pausado: false,
   radio: 3,
-  chispas: null,     // efecto compartido, se mueve al tomo bajo el puntero
-  aura: null,
-  hover: null,       // tomo actualmente apuntado
+  destellos: null,   // aura de sanacion (tomos propios)
+  rayos: null,       // descargas electricas (tomos ajenos)
+  hover: null,
 };
 
-function initEscena() {
-  const { canvas } = els;
+/* ---------- Texturas generadas al vuelo -------------------------------- */
 
-  ring3d.renderer = new THREE.WebGLRenderer({
-    canvas, alpha: true, antialias: true,
-  });
+function texturaPunto(interior = 'rgba(255,255,255,1)', exterior = 'rgba(255,255,255,0)') {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const c = cv.getContext('2d');
+  const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, interior);
+  g.addColorStop(0.35, interior);
+  g.addColorStop(1, exterior);
+  c.fillStyle = g;
+  c.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function texturaHalo() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 256;
+  const c = cv.getContext('2d');
+  const g = c.createRadialGradient(128, 128, 10, 128, 128, 128);
+  g.addColorStop(0,    'rgba(255,240,200,.85)');
+  g.addColorStop(0.28, 'rgba(255,215,130,.42)');
+  g.addColorStop(0.6,  'rgba(180,240,210,.16)');
+  g.addColorStop(1,    'rgba(180,240,210,0)');
+  c.fillStyle = g;
+  c.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* Destello de cuatro puntas, para el aura de sanacion */
+function texturaEstrella() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const c = cv.getContext('2d');
+
+  const g = c.createRadialGradient(64, 64, 0, 64, 64, 30);
+  g.addColorStop(0,    'rgba(255,255,255,1)');
+  g.addColorStop(0.22, 'rgba(170,255,190,.9)');
+  g.addColorStop(1,    'rgba(90,240,140,0)');
+  c.fillStyle = g;
+  c.fillRect(0, 0, 128, 128);
+
+  c.globalCompositeOperation = 'lighter';
+
+  const punta = (rot, largo, ancho, color) => {
+    c.save();
+    c.translate(64, 64);
+    c.rotate(rot);
+    c.fillStyle = color;
+    c.beginPath();
+    c.moveTo(0, -largo);
+    c.lineTo(ancho, 0);
+    c.lineTo(0, largo);
+    c.lineTo(-ancho, 0);
+    c.closePath();
+    c.fill();
+    c.restore();
+  };
+
+  punta(0, 62, 4.5, 'rgba(215,255,225,.95)');
+  punta(Math.PI / 2, 62, 4.5, 'rgba(215,255,225,.95)');
+  punta(Math.PI / 4, 30, 2.5, 'rgba(150,255,180,.55)');
+  punta(-Math.PI / 4, 30, 2.5, 'rgba(150,255,180,.55)');
+
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* ---------- Efectos ----------------------------------------------------- */
+
+/* Aura de sanacion (tomos propios): enjambre de destellos verdes de cuatro
+   puntas que titilan y ascienden en espiral alrededor del libro. */
+function crearDestellos() {
+  const grupo = new THREE.Group();
+  const tex = texturaEstrella();
+  const items = [];
+
+  for (let i = 0; i < 30; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, color: 0x9dffb4, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    grupo.add(sp);
+    items.push({
+      sp,
+      fase: Math.random(),
+      vel:  0.22 + Math.random() * 0.3,
+      base: 0.16 + Math.random() * 0.2,
+      ang:  Math.random() * Math.PI * 2,
+      rad:  0.25 + Math.random() * 0.62,
+      giro: (Math.random() - 0.5) * 0.5,
+    });
+  }
+
+  grupo.visible = false;
+  grupo.userData = { items };
+  return grupo;
+}
+
+/* Polilinea quebrada por desplazamiento del punto medio: da el aspecto
+   de descarga electrica. 5 pasadas sobre 2 puntos -> 33 puntos. */
+function trazarRayo(a, b, pasadas, caos) {
+  let pts = [a.clone(), b.clone()];
+  for (let paso = 0; paso < pasadas; paso++) {
+    const salida = [];
+    const amp = caos / (paso + 1);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i], p1 = pts[i + 1];
+      const medio = p0.clone().add(p1).multiplyScalar(0.5);
+      medio.x += (Math.random() - 0.5) * amp;
+      medio.y += (Math.random() - 0.5) * amp;
+      medio.z += (Math.random() - 0.5) * amp;
+      salida.push(p0, medio);
+    }
+    salida.push(pts[pts.length - 1]);
+    pts = salida;
+  }
+  return pts;
+}
+
+const PUNTOS_RAYO = 33;
+
+/* Rayos (tomos ajenos): arcos cian que nacen del libro, lo recorren y se
+   apagan de golpe, reapareciendo en otra posicion. */
+function crearRayos() {
+  const grupo = new THREE.Group();
+  const arcos = [];
+
+  for (let i = 0; i < 6; i++) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PUNTOS_RAYO * 3), 3));
+    const linea = new THREE.Line(geo, new THREE.LineBasicMaterial({
+      color: 0xbdf4ff, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    grupo.add(linea);
+    arcos.push({ linea, vida: Math.random() * 0.3, duracion: 0.16 + Math.random() * 0.2 });
+  }
+
+  const nucleo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texturaPunto('rgba(200,245,255,1)'),
+    color: 0x7fe4ff, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  nucleo.scale.setScalar(1.5);
+  grupo.add(nucleo);
+
+  grupo.visible = false;
+  grupo.userData = { arcos, nucleo, caja: new THREE.Vector3(1, 1.4, 0.6) };
+  return grupo;
+}
+
+/* ---------- Montaje de la escena ---------------------------------------- */
+
+function initEscena() {
+  ring3d.renderer = new THREE.WebGLRenderer({ canvas: els.canvas, alpha: true, antialias: true });
   ring3d.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   ring3d.renderer.outputColorSpace = THREE.SRGBColorSpace;
   ring3d.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -140,11 +320,12 @@ function initEscena() {
 
   ring3d.scene = new THREE.Scene();
 
-  ring3d.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-  ring3d.camera.position.set(0, 1.15, 6);
+  // FOV cerrado a proposito: con un angulo ancho los tomos del fondo del
+  // anillo se veian a poco mas de la mitad del tamano de los de adelante.
+  ring3d.camera = new THREE.PerspectiveCamera(18, 1, 0.1, 200);
+  ring3d.camera.position.set(0, 2.2, 14);
   ring3d.camera.lookAt(0, 0, 0);
 
-  // Luz: ambiente frio (aurora) + cenital calida + relleno frontal
   ring3d.scene.add(new THREE.HemisphereLight(0x9fe8ff, 0x101c26, 1.25));
 
   const key = new THREE.DirectionalLight(0xffe3ad, 2.1);
@@ -163,16 +344,20 @@ function initEscena() {
   ring3d.scene.add(ring3d.grupo);
 
   // Un solo juego de efectos, reutilizado: se reposiciona sobre el tomo
-  // apuntado en vez de crear particulas por cada libro.
-  ring3d.chispas = crearChispas();
-  ring3d.aura = crearAura();
-  ring3d.grupo.add(ring3d.chispas, ring3d.aura);
+  // apuntado en vez de crear particulas para cada libro.
+  ring3d.destellos = crearDestellos();
+  ring3d.rayos = crearRayos();
+  ring3d.grupo.add(ring3d.destellos, ring3d.rayos);
 
   redimensionar();
   window.addEventListener('resize', redimensionar);
 
-  canvas.addEventListener('pointerdown', alClickearCanvas);
-  canvas.addEventListener('pointermove', alMoverPuntero);
+  els.canvas.addEventListener('pointerdown', alClickearCanvas);
+  els.canvas.addEventListener('pointermove', alMoverPuntero);
+  els.canvas.addEventListener('pointerleave', () => {
+    ring3d.puntero.set(999, 999);
+    ring3d.punteroSucio = true;
+  });
 
   ring3d.renderer.setAnimationLoop(animar);
   ring3d.ok = true;
@@ -180,8 +365,7 @@ function initEscena() {
 
 function redimensionar() {
   if (!ring3d.renderer) return;
-  const w = els.stage.clientWidth;
-  const h = els.stage.clientHeight;
+  const w = els.stage.clientWidth, h = els.stage.clientHeight;
   if (!w || !h) return;
   ring3d.renderer.setSize(w, h, false);
   ring3d.camera.aspect = w / h;
@@ -189,10 +373,9 @@ function redimensionar() {
   encuadrarCamara();
 }
 
-/* Centra, orienta y escala un modelo recien cargado.
-   El eje mas delgado del libro pasa a ser Z, asi la tapa mira hacia +Z
-   (hacia afuera de la ronda). */
-function normalizarModelo(gltfScene, alturaObjetivo = 1.25) {
+/* Centra, orienta y escala un modelo recien cargado. El eje mas delgado
+   pasa a ser Z, asi la tapa mira hacia afuera de la ronda. */
+function normalizarModelo(gltfScene, diagonalObjetivo = 2.0) {
   const contenedor = new THREE.Group();
   const interno = new THREE.Group();
   interno.add(gltfScene);
@@ -203,19 +386,21 @@ function normalizarModelo(gltfScene, alturaObjetivo = 1.25) {
   const dims = [tam.x, tam.y, tam.z];
   const iMin = dims.indexOf(Math.min(...dims));
 
-  if (iMin === 0) interno.rotation.y = Math.PI / 2;       // X delgado -> pasa a Z
-  else if (iMin === 1) interno.rotation.x = -Math.PI / 2; // Y delgado -> pasa a Z
+  if (iMin === 0) interno.rotation.y = Math.PI / 2;
+  else if (iMin === 1) interno.rotation.x = -Math.PI / 2;
 
-  // Recalcular ya rotado
   interno.updateMatrixWorld(true);
   caja = new THREE.Box3().setFromObject(interno);
   const tam2 = caja.getSize(new THREE.Vector3());
   const centro = caja.getCenter(new THREE.Vector3());
 
   interno.position.sub(centro);
-  const escala = alturaObjetivo / tam2.y;
-  contenedor.scale.setScalar(escala);
 
+  // Escalar por la diagonal de la tapa y no solo por el alto: los modelos
+  // tienen proporciones distintas y normalizar por un solo eje hacia que
+  // uno se viera mas chico que el otro.
+  const escala = diagonalObjetivo / Math.hypot(tam2.x, tam2.y);
+  contenedor.scale.setScalar(escala);
   contenedor.userData.tamano = tam2.clone().multiplyScalar(escala);
   return contenedor;
 }
@@ -223,162 +408,49 @@ function normalizarModelo(gltfScene, alturaObjetivo = 1.25) {
 async function cargarModelos() {
   const loader = new GLTFLoader();
   const cargar = (url) => new Promise((res, rej) => loader.load(url, res, undefined, rej));
-
   const [mine, others] = await Promise.all([
     cargar('models/tome-mine.glb'),
     cargar('models/tome-others.glb'),
   ]);
-
   ring3d.modelos.mine = normalizarModelo(mine.scene);
   ring3d.modelos.others = normalizarModelo(others.scene);
 }
 
-/* --- Texturas generadas al vuelo para chispas, auras y halos --- */
-
-function texturaPunto(interior = 'rgba(255,255,255,1)', exterior = 'rgba(255,255,255,0)') {
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = 64;
-  const ctx = cv.getContext('2d');
-  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, interior);
-  g.addColorStop(0.35, interior);
-  g.addColorStop(1, exterior);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 64, 64);
-  const t = new THREE.CanvasTexture(cv);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-function texturaHalo() {
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = 256;
-  const ctx = cv.getContext('2d');
-  const g = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
-  g.addColorStop(0,    'rgba(255,240,200,.85)');
-  g.addColorStop(0.28, 'rgba(255,215,130,.42)');
-  g.addColorStop(0.6,  'rgba(180,240,210,.16)');
-  g.addColorStop(1,    'rgba(180,240,210,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 256, 256);
-  const t = new THREE.CanvasTexture(cv);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-/* Chispas electricas: para los tomos propios, al pasar el puntero.
-   Particulas rapidas que saltan y se reinician, en azul frio. */
-function crearChispas() {
-  const N = 70;
-  const geo = new THREE.BufferGeometry();
-  const pos = new Float32Array(N * 3);
-  const vel = new Float32Array(N * 3);
-  const vida = new Float32Array(N);
-
-  for (let i = 0; i < N; i++) vida[i] = Math.random();
-
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-
-  const mat = new THREE.PointsMaterial({
-    size: 0.055,
-    map: texturaPunto('rgba(215,245,255,1)'),
-    color: 0x9fe4ff,
-    transparent: true,
-    opacity: 0,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    sizeAttenuation: true,
-  });
-
-  const pts = new THREE.Points(geo, mat);
-  pts.visible = false;
-  pts.userData = { vel, vida, N, caja: new THREE.Vector3(1, 1, 0.6) };
-  return pts;
-}
-
-/* Aura de restauracion: para los tomos ajenos, al pasar el puntero.
-   Anillo dorado que gira y motas que ascienden. */
-function crearAura() {
-  const grupo = new THREE.Group();
-
-  const anillo = new THREE.Mesh(
-    new THREE.TorusGeometry(0.72, 0.045, 8, 64),
-    new THREE.MeshBasicMaterial({
-      map: texturaPunto('rgba(255,235,170,1)'),
-      color: 0xffd98a,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-  anillo.rotation.x = Math.PI / 2;
-  grupo.add(anillo);
-
-  const N = 34;
-  const geo = new THREE.BufferGeometry();
-  const pos = new Float32Array(N * 3);
-  const fase = new Float32Array(N);
-  const radio = new Float32Array(N);
-  for (let i = 0; i < N; i++) {
-    fase[i] = Math.random();
-    radio[i] = 0.28 + Math.random() * 0.5;
-  }
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-
-  const motas = new THREE.Points(geo, new THREE.PointsMaterial({
-    size: 0.07,
-    map: texturaPunto('rgba(255,240,200,1)'),
-    color: 0xffe6a8,
-    transparent: true,
-    opacity: 0,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  }));
-  grupo.add(motas);
-
-  grupo.visible = false;
-  grupo.userData = { anillo, motas, fase, radio, N };
-  return grupo;
-}
-
-/* Rotulo con titulo y autor, dibujado en un canvas y pegado sobre la tapa */
+/* Rotulo con titulo y autor, dibujado en canvas y pegado sobre la tapa */
 function crearRotulo(nota, ancho, alto) {
   const cv = document.createElement('canvas');
   cv.width = 640; cv.height = 200;
-  const ctx = cv.getContext('2d');
+  const c = cv.getContext('2d');
 
-  ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.textAlign = 'center';
-  ctx.shadowColor = 'rgba(0,0,0,.85)';
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 3;
+  c.clearRect(0, 0, cv.width, cv.height);
+  c.textAlign = 'center';
+  c.shadowColor = 'rgba(0,0,0,.85)';
+  c.shadowBlur = 10;
+  c.shadowOffsetY = 3;
 
-  ctx.fillStyle = '#f6e6bd';
-  ctx.font = '700 62px Cinzel, Georgia, serif';
-  const titulo = tituloDe(nota, 22);
-  ctx.fillText(titulo, cv.width / 2, 84, cv.width - 40);
+  c.fillStyle = '#f6e6bd';
+  c.font = '700 62px Cinzel, Georgia, serif';
+  c.fillText(tituloDe(nota, 22), cv.width / 2, 84, cv.width - 40);
 
-  ctx.fillStyle = 'rgba(240,205,140,.92)';
-  ctx.font = '500 42px Cinzel, Georgia, serif';
-  ctx.fillText((nota.autor || '').toUpperCase(), cv.width / 2, 150, cv.width - 60);
+  c.fillStyle = 'rgba(240,205,140,.92)';
+  c.font = '500 42px Cinzel, Georgia, serif';
+  c.fillText((nota.autor || '').toUpperCase(), cv.width / 2, 150, cv.width - 60);
 
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
 
-  const mat = new THREE.MeshBasicMaterial({
-    map: tex, transparent: true, depthWrite: false,
-  });
-
   const w = ancho * 0.78;
-  const plano = new THREE.Mesh(new THREE.PlaneGeometry(w, w * (200 / 640)), mat);
+  const plano = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, w * (200 / 640)),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
+  );
   plano.position.y = -alto * 0.26;
   return plano;
 }
 
-/* Clona la plantilla y le da materiales propios, para poder atenuar o
-   iluminar un tomo sin afectar a los demas. */
+/* Clona la plantilla con materiales propios, para poder atenuar o iluminar
+   un tomo sin afectar a los demas. */
 function instanciarTomo(nota) {
   const plantilla = esMia(nota) ? ring3d.modelos.mine : ring3d.modelos.others;
   const obj = plantilla.clone(true);
@@ -401,13 +473,9 @@ function instanciarTomo(nota) {
   rotulo.position.z = tam.z / 2 + 0.012;
   obj.add(rotulo);
 
-  // Halo que se enciende cuando el tomo asciende por una busqueda
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: texturaHalo(),
-    transparent: true,
-    opacity: 0,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
+    map: texturaHalo(), transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
   }));
   halo.scale.setScalar(Math.max(tam.x, tam.y) * 2.4);
   halo.visible = false;
@@ -419,7 +487,6 @@ function instanciarTomo(nota) {
 function construirRonda() {
   if (!ring3d.ok) return;
 
-  // Limpiar la ronda anterior
   for (const t of ring3d.tomos) {
     ring3d.grupo.remove(t.obj);
     t.obj.traverse((n) => {
@@ -432,8 +499,8 @@ function construirRonda() {
   }
   ring3d.tomos = [];
   ring3d.hover = null;
-  if (ring3d.chispas) ring3d.chispas.visible = false;
-  if (ring3d.aura) ring3d.aura.visible = false;
+  ring3d.destellos.visible = false;
+  ring3d.rayos.visible = false;
 
   const enRonda = notas.slice(0, MAX_EN_RONDA);
   const total = enRonda.length;
@@ -445,37 +512,38 @@ function construirRonda() {
 
   if (!total) { encuadrarCamara(); return; }
 
-  // Radio segun cantidad, para que los tomos no se toquen
-  const anchoTomo = (ring3d.modelos.mine.userData.tamano.x) * 1.35;
+  const anchoTomo = ring3d.modelos.mine.userData.tamano.x * 1.35;
   ring3d.radio = Math.max(2.2, (total * anchoTomo) / (2 * Math.PI));
 
   enRonda.forEach((nota, i) => {
     const inst = instanciarTomo(nota);
-    const { obj, materiales } = inst;
     const ang = (i / total) * Math.PI * 2;
 
-    obj.position.set(Math.sin(ang) * ring3d.radio, 0, Math.cos(ang) * ring3d.radio);
-    obj.rotation.y = ang;              // la tapa mira hacia afuera
-    obj.userData.notaId = String(nota.id);
+    inst.obj.position.set(Math.sin(ang) * ring3d.radio, 0, Math.cos(ang) * ring3d.radio);
+    inst.obj.rotation.y = ang;
+    inst.obj.userData.notaId = String(nota.id);
 
-    ring3d.grupo.add(obj);
-    const { halo } = inst;
-    ring3d.tomos.push({ nota, obj, materiales, halo, tam: inst.tam, resaltado: false });
+    ring3d.grupo.add(inst.obj);
+    ring3d.tomos.push({
+      nota, obj: inst.obj, materiales: inst.materiales,
+      halo: inst.halo, tam: inst.tam, resaltado: false,
+    });
   });
 
   encuadrarCamara();
   aplicarBusqueda();
 }
 
-/* Aleja la camara a medida que la ronda crece, para que entre entera */
 function encuadrarCamara() {
   if (!ring3d.camera) return;
   const fov = THREE.MathUtils.degToRad(ring3d.camera.fov);
   const necesaria = (ring3d.radio + 1.1) / Math.tan(fov / 2);
-  const dist = Math.max(4.2, necesaria / Math.min(1, ring3d.camera.aspect * 0.9));
-  ring3d.camera.position.set(0, dist * 0.19, dist);
+  const dist = Math.max(9, necesaria / Math.min(1, ring3d.camera.aspect * 0.9));
+  ring3d.camera.position.set(0, dist * 0.16, dist);
   ring3d.camera.lookAt(0, 0, 0);
 }
+
+/* ---------- Puntero ----------------------------------------------------- */
 
 function alMoverPuntero(e) {
   const r = els.canvas.getBoundingClientRect();
@@ -485,14 +553,13 @@ function alMoverPuntero(e) {
 }
 
 /* Resuelve que tomo esta bajo el puntero y enciende el efecto que
-   corresponda: chispas para los propios, aura para los ajenos. */
+   corresponda: sanacion para los propios, rayos para los ajenos. */
 function actualizarHover() {
   if (!ring3d.punteroSucio) return;
   ring3d.punteroSucio = false;
 
   ring3d.raycaster.setFromCamera(ring3d.puntero, ring3d.camera);
-  const objetivos = ring3d.tomos.map((t) => t.obj);
-  const hits = ring3d.raycaster.intersectObjects(objetivos, true);
+  const hits = ring3d.raycaster.intersectObjects(ring3d.tomos.map((t) => t.obj), true);
 
   let encontrado = null;
   if (hits.length) {
@@ -503,36 +570,32 @@ function actualizarHover() {
 
   if (encontrado === ring3d.hover) return;
   ring3d.hover = encontrado;
-  els.canvas.style.cursor = encontrado ? 'pointer' : 'grab';
+  els.canvas.style.cursor = encontrado ? 'pointer' : 'default';
 
-  const { chispas, aura } = ring3d;
-  chispas.visible = false;
-  aura.visible = false;
+  const { destellos, rayos } = ring3d;
+  destellos.visible = false;
+  rayos.visible = false;
 
   if (!encontrado) return;
 
   const propio = esMia(encontrado.nota);
-  const efecto = propio ? chispas : aura;
+  const efecto = propio ? destellos : rayos;
+  const tam = encontrado.tam || { x: 1, y: 1.4, z: 0.6 };
+
   efecto.visible = true;
   efecto.position.copy(encontrado.obj.position);
   efecto.rotation.y = encontrado.obj.rotation.y;
 
   if (propio) {
-    // Reiniciar las chispas para que la rafaga arranque desde el tomo
-    const { vel, vida, N, caja } = chispas.userData;
-    const tam = encontrado.tam || { x: 1, y: 1.4, z: 0.6 };
-    caja.set(tam.x * 0.62, tam.y * 0.62, tam.z * 0.9);
-    const pos = chispas.geometry.attributes.position.array;
-    for (let i = 0; i < N; i++) {
-      vida[i] = Math.random();
-      pos[i*3]   = (Math.random() - 0.5) * caja.x * 2;
-      pos[i*3+1] = (Math.random() - 0.5) * caja.y * 2;
-      pos[i*3+2] = (Math.random() - 0.5) * caja.z * 2;
-      vel[i*3]   = (Math.random() - 0.5) * 1.6;
-      vel[i*3+1] = (Math.random() - 0.5) * 1.6;
-      vel[i*3+2] = (Math.random() - 0.5) * 1.2;
+    for (const it of destellos.userData.items) {
+      it.fase = Math.random();
+      it.rad = 0.25 + Math.random() * Math.max(tam.x, tam.y) * 0.55;
+      it.ang = Math.random() * Math.PI * 2;
     }
-    chispas.geometry.attributes.position.needsUpdate = true;
+  } else {
+    rayos.userData.caja.set(tam.x * 0.55, tam.y * 0.55, tam.z * 0.75);
+    for (const a of rayos.userData.arcos) a.vida = Math.random() * a.duracion;
+    rayos.userData.nucleo.scale.setScalar(Math.max(tam.x, tam.y) * 1.15);
   }
 }
 
@@ -544,13 +607,15 @@ function alClickearCanvas(e) {
   const hits = ring3d.raycaster.intersectObjects(ring3d.tomos.map((t) => t.obj), true);
   if (!hits.length) return;
 
-  let nodo = hits[0].object;
-  while (nodo && !nodo.userData.notaId) nodo = nodo.parent;
-  if (!nodo) return;
+  let n = hits[0].object;
+  while (n && !n.userData.notaId) n = n.parent;
+  if (!n) return;
 
-  const t = ring3d.tomos.find((x) => String(x.nota.id) === nodo.userData.notaId);
+  const t = ring3d.tomos.find((x) => String(x.nota.id) === n.userData.notaId);
   if (t) abrirTomo(t.nota);
 }
+
+/* ---------- Bucle de animacion ------------------------------------------ */
 
 function animar() {
   const dt = Math.min(ring3d.reloj.getDelta(), 0.05);
@@ -560,7 +625,6 @@ function animar() {
 
   actualizarHover();
 
-  // Los tomos resaltados por la busqueda suben, flotan y encienden su halo
   for (const tomo of ring3d.tomos) {
     const objetivo = tomo.resaltado ? 0.42 + Math.sin(t * 1.8) * 0.05 : 0;
     tomo.obj.position.y += (objetivo - tomo.obj.position.y) * Math.min(1, dt * 6);
@@ -573,75 +637,94 @@ function animar() {
     }
   }
 
-  animarChispas(dt);
-  animarAura(dt, t);
+  animarDestellos(dt, t);
+  animarRayos(dt);
 
   ring3d.renderer.render(ring3d.scene, ring3d.camera);
 }
 
-function animarChispas(dt) {
-  const ch = ring3d.chispas;
-  if (!ch || !ch.visible) {
-    if (ch) ch.material.opacity = 0;
+function animarDestellos(dt, t) {
+  const gr = ring3d.destellos;
+  if (!gr) return;
+
+  if (!gr.visible) {
+    for (const it of gr.userData.items) it.sp.material.opacity = 0;
     return;
   }
-  ch.material.opacity = Math.min(0.95, ch.material.opacity + dt * 5);
 
-  const { vel, vida, N, caja } = ch.userData;
-  const pos = ch.geometry.attributes.position.array;
+  for (const it of gr.userData.items) {
+    it.fase += dt * it.vel;
+    if (it.fase > 1) it.fase -= 1;
+    it.ang += dt * it.giro;
 
-  for (let i = 0; i < N; i++) {
-    vida[i] -= dt * 1.6;
-    if (vida[i] <= 0) {
-      // Renace pegada a la tapa, con un nuevo impulso
-      vida[i] = 0.5 + Math.random() * 0.5;
-      pos[i*3]   = (Math.random() - 0.5) * caja.x * 1.7;
-      pos[i*3+1] = (Math.random() - 0.5) * caja.y * 1.7;
-      pos[i*3+2] = caja.z * (Math.random() > 0.5 ? 1 : -1) * 0.8;
-      vel[i*3]   = (Math.random() - 0.5) * 1.8;
-      vel[i*3+1] = (Math.random() - 0.5) * 1.8;
-      vel[i*3+2] = (Math.random() - 0.5) * 1.3;
+    it.sp.position.set(
+      Math.cos(it.ang) * it.rad,
+      -0.75 + it.fase * 1.7,
+      Math.sin(it.ang) * it.rad
+    );
+
+    // Titileo: nacen, brillan y se apagan dentro de su ciclo
+    const brillo = Math.sin(it.fase * Math.PI);
+    it.sp.material.opacity = brillo * 0.92;
+    const pulso = 0.75 + Math.sin(t * 7 + it.ang * 3) * 0.25;
+    it.sp.scale.setScalar(it.base * brillo * pulso * 2.2 + 0.02);
+  }
+}
+
+function animarRayos(dt) {
+  const gr = ring3d.rayos;
+  if (!gr) return;
+
+  const { arcos, nucleo, caja } = gr.userData;
+
+  if (!gr.visible) {
+    for (const a of arcos) a.linea.material.opacity = 0;
+    nucleo.material.opacity = 0;
+    return;
+  }
+
+  nucleo.material.opacity = Math.min(0.32, nucleo.material.opacity + dt * 2.5);
+
+  const desde = new THREE.Vector3();
+  const hasta = new THREE.Vector3();
+
+  for (const a of arcos) {
+    a.vida -= dt;
+
+    if (a.vida <= 0) {
+      a.duracion = 0.14 + Math.random() * 0.22;
+      a.vida = a.duracion;
+
+      const cara = Math.random() > 0.45 ? 1 : -1;
+      desde.set(
+        (Math.random() - 0.5) * caja.x * 2,
+        (Math.random() - 0.5) * caja.y * 2,
+        caja.z * cara
+      );
+      // El otro extremo sale hacia afuera: el rayo "emana" del libro
+      hasta.set(
+        (Math.random() - 0.5) * caja.x * 3.2,
+        (Math.random() - 0.5) * caja.y * 3.2,
+        caja.z * cara * (1 + Math.random() * 1.8)
+      );
+
+      const pts = trazarRayo(desde, hasta, 5, Math.max(caja.x, caja.y) * 1.1);
+      const arr = a.linea.geometry.attributes.position.array;
+      for (let i = 0; i < PUNTOS_RAYO; i++) {
+        const p = pts[Math.min(i, pts.length - 1)];
+        arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z;
+      }
+      a.linea.geometry.attributes.position.needsUpdate = true;
+      a.linea.material.opacity = 0.95;
+    } else {
+      // Se apaga de golpe al final, como una descarga real
+      const k = a.vida / a.duracion;
+      a.linea.material.opacity = k * k * 0.95;
     }
-    // Movimiento nervioso: el impulso se sacude en cada cuadro
-    pos[i*3]   += vel[i*3]   * dt + (Math.random() - 0.5) * 0.02;
-    pos[i*3+1] += vel[i*3+1] * dt + (Math.random() - 0.5) * 0.02;
-    pos[i*3+2] += vel[i*3+2] * dt;
   }
-  ch.geometry.attributes.position.needsUpdate = true;
 }
 
-function animarAura(dt, t) {
-  const au = ring3d.aura;
-  if (!au) return;
-  const { anillo, motas, fase, radio, N } = au.userData;
-
-  if (!au.visible) {
-    anillo.material.opacity = 0;
-    motas.material.opacity = 0;
-    return;
-  }
-
-  anillo.material.opacity = Math.min(0.6, anillo.material.opacity + dt * 3);
-  motas.material.opacity  = Math.min(0.85, motas.material.opacity + dt * 3);
-
-  anillo.rotation.z += dt * 0.9;
-  anillo.position.y = -0.55 + Math.sin(t * 1.5) * 0.05;
-  const pulso = 1 + Math.sin(t * 2.2) * 0.06;
-  anillo.scale.setScalar(pulso);
-
-  const pos = motas.geometry.attributes.position.array;
-  for (let i = 0; i < N; i++) {
-    fase[i] += dt * 0.42;
-    if (fase[i] > 1) fase[i] -= 1;
-    const ang = i * 2.4 + t * 0.6;
-    pos[i*3]   = Math.cos(ang) * radio[i];
-    pos[i*3+1] = -0.6 + fase[i] * 1.5;
-    pos[i*3+2] = Math.sin(ang) * radio[i];
-  }
-  motas.geometry.attributes.position.needsUpdate = true;
-}
-
-/* ---------- Bibliotecas laterales -------------------------------------- */
+/* ---------- Bibliotecas laterales --------------------------------------- */
 
 function renderEstanterias() {
   const mias  = notas.filter(esMia);
@@ -677,7 +760,7 @@ function pintarEstante(contenedor, lista) {
   });
 }
 
-/* ---------- Buscador ---------------------------------------------------- */
+/* ---------- Buscador ----------------------------------------------------- */
 
 function aplicarBusqueda() {
   const q = els.search.value.trim().toLowerCase();
@@ -697,7 +780,6 @@ function aplicarBusqueda() {
     (n.autor  || '').toLowerCase().includes(q);
 
   const ids = new Set(notas.filter(coincide).map((n) => String(n.id)));
-
   ring3d.pausado = ids.size > 0;
 
   for (const t of ring3d.tomos) {
@@ -727,7 +809,7 @@ function atenuar(tomo, apagar) {
   }
 }
 
-/* ---------- Lector ------------------------------------------------------ */
+/* ---------- Lector ------------------------------------------------------- */
 
 function abrirTomo(nota) {
   els.reader.querySelector('.reader-tome-title').textContent = tituloDe(nota, 120);
@@ -751,7 +833,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !els.reader.hidden) cerrarTomo();
 });
 
-/* ---------- API --------------------------------------------------------- */
+/* ---------- API ---------------------------------------------------------- */
 
 async function cargarNotas() {
   try {
@@ -762,7 +844,6 @@ async function cargarNotas() {
     }
     const nuevas = await res.json();
 
-    // Solo reconstruir la escena 3D si realmente cambio algo
     const cambio = JSON.stringify(nuevas.map((n) => n.id)) !==
                    JSON.stringify(notas.map((n) => n.id));
     notas = nuevas;
@@ -818,7 +899,21 @@ els.form.addEventListener('submit', async (e) => {
 
 els.search.addEventListener('input', aplicarBusqueda);
 
-/* ---------- Arranque ---------------------------------------------------- */
+/* ---------- Dragon: escupe fuego al hacerle click ------------------------ */
+
+const dragon = document.querySelector('.dragon');
+const dragonRig = document.querySelector('.dragon-rig');
+
+if (dragon && dragonRig) {
+  dragon.addEventListener('click', () => {
+    if (dragonRig.classList.contains('is-breathing')) return;
+    dragonRig.classList.add('is-breathing');
+    rugido();
+    setTimeout(() => dragonRig.classList.remove('is-breathing'), 1100);
+  });
+}
+
+/* ---------- Arranque ----------------------------------------------------- */
 
 els.gateForm.addEventListener('submit', (e) => {
   e.preventDefault();

@@ -145,7 +145,7 @@ body {
   position: fixed;
   top: 11vh;
   left: 0;
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
   animation: fly-across 38s linear infinite;
 }
@@ -166,12 +166,33 @@ body {
 }
 
 .dragon {
-  width: 190px;
-  height: 95px;
+  width: 265px;
+  height: 90px;
   display: block;
   transform: scaleX(-1); /* la cabeza mira hacia donde vuela */
   filter: drop-shadow(0 0 14px rgba(70, 227, 154, .35));
+  pointer-events: auto;  /* se le puede hacer click para que escupa fuego */
+  cursor: pointer;
 }
+
+/* --- Llamarada en pixel art --- */
+.fire { opacity: 0; }
+.fl-core { fill: #fff3c4; }
+.fl-mid  { fill: #ffb238; }
+.fl-out  { fill: #e8541f; }
+
+/* Mientras dura el soplido, los tres fotogramas se turnan */
+.dragon-rig.is-breathing .fire-a { animation: fl-a .18s steps(1) infinite; }
+.dragon-rig.is-breathing .fire-b { animation: fl-b .18s steps(1) infinite; }
+.dragon-rig.is-breathing .fire-c { animation: fl-c .18s steps(1) infinite; }
+
+.dragon-rig.is-breathing .dragon {
+  filter: drop-shadow(0 0 16px rgba(255, 150, 50, .75));
+}
+
+@keyframes fl-a { 0%,32% { opacity: 1; } 33%,100% { opacity: 0; } }
+@keyframes fl-b { 0%,32% { opacity: 0; } 33%,65% { opacity: 1; } 66%,100% { opacity: 0; } }
+@keyframes fl-c { 0%,65% { opacity: 0; } 66%,100% { opacity: 1; } }
 
 .dragon-body rect { fill: #1d2b3a; }
 .dragon-body rect:nth-child(-n+3) { fill: #24374a; }
@@ -860,5 +881,8 @@ body {
     animation: none !important;
   }
   .reader-book { animation: fade-in .2s ease both; }
+  .dragon-rig.is-breathing .fire-a { animation: none; opacity: 1; }
+  .dragon-rig.is-breathing .fire-b,
+  .dragon-rig.is-breathing .fire-c { animation: none; opacity: 0; }
   .dragon-flight { display: none; }
 }
