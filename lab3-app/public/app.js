@@ -122,6 +122,9 @@ const ring3d = {
   reloj: new THREE.Clock(),
   pausado: false,
   radio: 3,
+  chispas: null,     // efecto compartido, se mueve al tomo bajo el puntero
+  aura: null,
+  hover: null,       // tomo actualmente apuntado
 };
 
 function initEscena() {
@@ -158,6 +161,12 @@ function initEscena() {
 
   ring3d.grupo = new THREE.Group();
   ring3d.scene.add(ring3d.grupo);
+
+  // Un solo juego de efectos, reutilizado: se reposiciona sobre el tomo
+  // apuntado en vez de crear particulas por cada libro.
+  ring3d.chispas = crearChispas();
+  ring3d.aura = crearAura();
+  ring3d.grupo.add(ring3d.chispas, ring3d.aura);
 
   redimensionar();
   window.addEventListener('resize', redimensionar);
@@ -224,6 +233,115 @@ async function cargarModelos() {
   ring3d.modelos.others = normalizarModelo(others.scene);
 }
 
+/* --- Texturas generadas al vuelo para chispas, auras y halos --- */
+
+function texturaPunto(interior = 'rgba(255,255,255,1)', exterior = 'rgba(255,255,255,0)') {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, interior);
+  g.addColorStop(0.35, interior);
+  g.addColorStop(1, exterior);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function texturaHalo() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 256;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
+  g.addColorStop(0,    'rgba(255,240,200,.85)');
+  g.addColorStop(0.28, 'rgba(255,215,130,.42)');
+  g.addColorStop(0.6,  'rgba(180,240,210,.16)');
+  g.addColorStop(1,    'rgba(180,240,210,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* Chispas electricas: para los tomos propios, al pasar el puntero.
+   Particulas rapidas que saltan y se reinician, en azul frio. */
+function crearChispas() {
+  const N = 70;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3);
+  const vel = new Float32Array(N * 3);
+  const vida = new Float32Array(N);
+
+  for (let i = 0; i < N; i++) vida[i] = Math.random();
+
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.055,
+    map: texturaPunto('rgba(215,245,255,1)'),
+    color: 0x9fe4ff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+
+  const pts = new THREE.Points(geo, mat);
+  pts.visible = false;
+  pts.userData = { vel, vida, N, caja: new THREE.Vector3(1, 1, 0.6) };
+  return pts;
+}
+
+/* Aura de restauracion: para los tomos ajenos, al pasar el puntero.
+   Anillo dorado que gira y motas que ascienden. */
+function crearAura() {
+  const grupo = new THREE.Group();
+
+  const anillo = new THREE.Mesh(
+    new THREE.TorusGeometry(0.72, 0.045, 8, 64),
+    new THREE.MeshBasicMaterial({
+      map: texturaPunto('rgba(255,235,170,1)'),
+      color: 0xffd98a,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  anillo.rotation.x = Math.PI / 2;
+  grupo.add(anillo);
+
+  const N = 34;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3);
+  const fase = new Float32Array(N);
+  const radio = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    fase[i] = Math.random();
+    radio[i] = 0.28 + Math.random() * 0.5;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
+  const motas = new THREE.Points(geo, new THREE.PointsMaterial({
+    size: 0.07,
+    map: texturaPunto('rgba(255,240,200,1)'),
+    color: 0xffe6a8,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  }));
+  grupo.add(motas);
+
+  grupo.visible = false;
+  grupo.userData = { anillo, motas, fase, radio, N };
+  return grupo;
+}
+
 /* Rotulo con titulo y autor, dibujado en un canvas y pegado sobre la tapa */
 function crearRotulo(nota, ancho, alto) {
   const cv = document.createElement('canvas');
@@ -283,7 +401,19 @@ function instanciarTomo(nota) {
   rotulo.position.z = tam.z / 2 + 0.012;
   obj.add(rotulo);
 
-  return { obj, materiales, tam };
+  // Halo que se enciende cuando el tomo asciende por una busqueda
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texturaHalo(),
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  }));
+  halo.scale.setScalar(Math.max(tam.x, tam.y) * 2.4);
+  halo.visible = false;
+  obj.add(halo);
+
+  return { obj, materiales, tam, halo };
 }
 
 function construirRonda() {
@@ -301,6 +431,9 @@ function construirRonda() {
     });
   }
   ring3d.tomos = [];
+  ring3d.hover = null;
+  if (ring3d.chispas) ring3d.chispas.visible = false;
+  if (ring3d.aura) ring3d.aura.visible = false;
 
   const enRonda = notas.slice(0, MAX_EN_RONDA);
   const total = enRonda.length;
@@ -317,7 +450,8 @@ function construirRonda() {
   ring3d.radio = Math.max(2.2, (total * anchoTomo) / (2 * Math.PI));
 
   enRonda.forEach((nota, i) => {
-    const { obj, materiales } = instanciarTomo(nota);
+    const inst = instanciarTomo(nota);
+    const { obj, materiales } = inst;
     const ang = (i / total) * Math.PI * 2;
 
     obj.position.set(Math.sin(ang) * ring3d.radio, 0, Math.cos(ang) * ring3d.radio);
@@ -325,7 +459,8 @@ function construirRonda() {
     obj.userData.notaId = String(nota.id);
 
     ring3d.grupo.add(obj);
-    ring3d.tomos.push({ nota, obj, materiales, alturaBase: 0, alturaObjetivo: 0, resaltado: false });
+    const { halo } = inst;
+    ring3d.tomos.push({ nota, obj, materiales, halo, tam: inst.tam, resaltado: false });
   });
 
   encuadrarCamara();
@@ -346,6 +481,59 @@ function alMoverPuntero(e) {
   const r = els.canvas.getBoundingClientRect();
   ring3d.puntero.x = ((e.clientX - r.left) / r.width) * 2 - 1;
   ring3d.puntero.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  ring3d.punteroSucio = true;
+}
+
+/* Resuelve que tomo esta bajo el puntero y enciende el efecto que
+   corresponda: chispas para los propios, aura para los ajenos. */
+function actualizarHover() {
+  if (!ring3d.punteroSucio) return;
+  ring3d.punteroSucio = false;
+
+  ring3d.raycaster.setFromCamera(ring3d.puntero, ring3d.camera);
+  const objetivos = ring3d.tomos.map((t) => t.obj);
+  const hits = ring3d.raycaster.intersectObjects(objetivos, true);
+
+  let encontrado = null;
+  if (hits.length) {
+    let n = hits[0].object;
+    while (n && !n.userData.notaId) n = n.parent;
+    if (n) encontrado = ring3d.tomos.find((t) => String(t.nota.id) === n.userData.notaId) || null;
+  }
+
+  if (encontrado === ring3d.hover) return;
+  ring3d.hover = encontrado;
+  els.canvas.style.cursor = encontrado ? 'pointer' : 'grab';
+
+  const { chispas, aura } = ring3d;
+  chispas.visible = false;
+  aura.visible = false;
+
+  if (!encontrado) return;
+
+  const propio = esMia(encontrado.nota);
+  const efecto = propio ? chispas : aura;
+  efecto.visible = true;
+  efecto.position.copy(encontrado.obj.position);
+  efecto.rotation.y = encontrado.obj.rotation.y;
+
+  if (propio) {
+    // Reiniciar las chispas para que la rafaga arranque desde el tomo
+    const { vel, vida, N, caja } = chispas.userData;
+    const tam = encontrado.tam || { x: 1, y: 1.4, z: 0.6 };
+    caja.set(tam.x * 0.62, tam.y * 0.62, tam.z * 0.9);
+    const pos = chispas.geometry.attributes.position.array;
+    for (let i = 0; i < N; i++) {
+      vida[i] = Math.random();
+      pos[i*3]   = (Math.random() - 0.5) * caja.x * 2;
+      pos[i*3+1] = (Math.random() - 0.5) * caja.y * 2;
+      pos[i*3+2] = (Math.random() - 0.5) * caja.z * 2;
+      vel[i*3]   = (Math.random() - 0.5) * 1.6;
+      vel[i*3+1] = (Math.random() - 0.5) * 1.6;
+      vel[i*3+2] = (Math.random() - 0.5) * 1.2;
+    }
+    chispas.geometry.attributes.position.needsUpdate = true;
+  }
 }
 
 function alClickearCanvas(e) {
@@ -353,7 +541,7 @@ function alClickearCanvas(e) {
   alMoverPuntero(e);
   ring3d.raycaster.setFromCamera(ring3d.puntero, ring3d.camera);
 
-  const hits = ring3d.raycaster.intersectObjects(ring3d.grupo.children, true);
+  const hits = ring3d.raycaster.intersectObjects(ring3d.tomos.map((t) => t.obj), true);
   if (!hits.length) return;
 
   let nodo = hits[0].object;
@@ -365,18 +553,92 @@ function alClickearCanvas(e) {
 }
 
 function animar() {
-  const dt = ring3d.reloj.getDelta();
+  const dt = Math.min(ring3d.reloj.getDelta(), 0.05);
+  const t = ring3d.reloj.getElapsedTime();
 
   if (!ring3d.pausado) ring3d.grupo.rotation.y += dt * 0.14;
 
-  // Los tomos resaltados suben y flotan
-  const t = ring3d.reloj.getElapsedTime();
+  actualizarHover();
+
+  // Los tomos resaltados por la busqueda suben, flotan y encienden su halo
   for (const tomo of ring3d.tomos) {
     const objetivo = tomo.resaltado ? 0.42 + Math.sin(t * 1.8) * 0.05 : 0;
     tomo.obj.position.y += (objetivo - tomo.obj.position.y) * Math.min(1, dt * 6);
+
+    if (tomo.halo) {
+      const meta = tomo.resaltado ? 0.55 + Math.sin(t * 2.4) * 0.14 : 0;
+      const m = tomo.halo.material;
+      m.opacity += (meta - m.opacity) * Math.min(1, dt * 5);
+      tomo.halo.visible = m.opacity > 0.01;
+    }
   }
 
+  animarChispas(dt);
+  animarAura(dt, t);
+
   ring3d.renderer.render(ring3d.scene, ring3d.camera);
+}
+
+function animarChispas(dt) {
+  const ch = ring3d.chispas;
+  if (!ch || !ch.visible) {
+    if (ch) ch.material.opacity = 0;
+    return;
+  }
+  ch.material.opacity = Math.min(0.95, ch.material.opacity + dt * 5);
+
+  const { vel, vida, N, caja } = ch.userData;
+  const pos = ch.geometry.attributes.position.array;
+
+  for (let i = 0; i < N; i++) {
+    vida[i] -= dt * 1.6;
+    if (vida[i] <= 0) {
+      // Renace pegada a la tapa, con un nuevo impulso
+      vida[i] = 0.5 + Math.random() * 0.5;
+      pos[i*3]   = (Math.random() - 0.5) * caja.x * 1.7;
+      pos[i*3+1] = (Math.random() - 0.5) * caja.y * 1.7;
+      pos[i*3+2] = caja.z * (Math.random() > 0.5 ? 1 : -1) * 0.8;
+      vel[i*3]   = (Math.random() - 0.5) * 1.8;
+      vel[i*3+1] = (Math.random() - 0.5) * 1.8;
+      vel[i*3+2] = (Math.random() - 0.5) * 1.3;
+    }
+    // Movimiento nervioso: el impulso se sacude en cada cuadro
+    pos[i*3]   += vel[i*3]   * dt + (Math.random() - 0.5) * 0.02;
+    pos[i*3+1] += vel[i*3+1] * dt + (Math.random() - 0.5) * 0.02;
+    pos[i*3+2] += vel[i*3+2] * dt;
+  }
+  ch.geometry.attributes.position.needsUpdate = true;
+}
+
+function animarAura(dt, t) {
+  const au = ring3d.aura;
+  if (!au) return;
+  const { anillo, motas, fase, radio, N } = au.userData;
+
+  if (!au.visible) {
+    anillo.material.opacity = 0;
+    motas.material.opacity = 0;
+    return;
+  }
+
+  anillo.material.opacity = Math.min(0.6, anillo.material.opacity + dt * 3);
+  motas.material.opacity  = Math.min(0.85, motas.material.opacity + dt * 3);
+
+  anillo.rotation.z += dt * 0.9;
+  anillo.position.y = -0.55 + Math.sin(t * 1.5) * 0.05;
+  const pulso = 1 + Math.sin(t * 2.2) * 0.06;
+  anillo.scale.setScalar(pulso);
+
+  const pos = motas.geometry.attributes.position.array;
+  for (let i = 0; i < N; i++) {
+    fase[i] += dt * 0.42;
+    if (fase[i] > 1) fase[i] -= 1;
+    const ang = i * 2.4 + t * 0.6;
+    pos[i*3]   = Math.cos(ang) * radio[i];
+    pos[i*3+1] = -0.6 + fase[i] * 1.5;
+    pos[i*3+2] = Math.sin(ang) * radio[i];
+  }
+  motas.geometry.attributes.position.needsUpdate = true;
 }
 
 /* ---------- Bibliotecas laterales -------------------------------------- */
