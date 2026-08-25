@@ -44,9 +44,12 @@ lab3-app/
 └── public/
     ├── index.html
     ├── style.css
-    ├── app.js
-    └── img/
-        └── teracloud.png   <- hay que agregarlo a mano (ver abajo)
+    ├── app.js          modulo ES (usa three.js)
+    ├── img/
+    │   └── aurora.webp     fondo del cielo
+    └── models/
+        ├── tome-mine.glb    modelo de "tus tomos"
+        └── tome-others.glb  modelo de "tomos de otros"
 ```
 
 ## Variables de entorno
@@ -113,14 +116,6 @@ No hay sistema de login. La app pide el nombre del visitante la primera vez
 y lo guarda en el navegador (`localStorage`), y lo manda en cada POST. Eso
 es lo que permite separar en pantalla "tus tomos" de "tomos de otros".
 
-## Falta agregar: el logo
-
-El estandarte que cuelga del dragon carga `public/img/teracloud.png`.
-Hay que copiar ahi el logo de Teracloud con ese nombre exacto (PNG con
-fondo transparente, ~200x90 px).
-
-Si el archivo no existe la app no se rompe: el cartel muestra la palabra
-"teracloud" en texto.
 
 ## Probar en local
 

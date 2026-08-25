@@ -127,5 +127,5 @@ terraform output
 
 ## Convenciones
 
-Ver `CONVENCIONES.md` (naming y tagging) y `docs/runbook.md` (operación y
+Ver `docs/convenciones.md` (naming y tagging) y `docs/runbook.md` (operación y
 resolución de problemas conocidos).
