@@ -511,6 +511,7 @@ body {
   height: 100%;
   display: block;
   cursor: grab;
+  touch-action: none;  /* el arrastre lo maneja la escena, no el scroll */
 }
 
 .stage-note {
@@ -779,6 +780,38 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Quemar el tomo: solo aparece en las notas propias */
+.reader-burn {
+  margin-top: 1.6rem;
+  padding: .5rem 1.2rem;
+  font-family: "Cinzel", serif;
+  font-size: .68rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #6b2b16;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgba(140, 60, 30, .5);
+  border-radius: 2px;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+
+.reader-burn:hover:not(:disabled) {
+  background: rgba(180, 70, 35, .12);
+  border-color: rgba(160, 70, 35, .8);
+}
+
+.reader-burn.is-confirming {
+  color: #fff2e2;
+  background: linear-gradient(180deg, #b8471f, #8a3113);
+  border-color: #6b2b16;
+}
+
+.reader-burn:disabled { opacity: .6; cursor: default; }
+.reader-burn[hidden] { display: none; }
+
+.reader-burn:focus-visible { outline: 2px solid var(--ember-lit); outline-offset: 2px; }
 
 .reader-close {
   position: absolute;

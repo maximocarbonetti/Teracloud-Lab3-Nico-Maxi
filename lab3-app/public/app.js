@@ -5,6 +5,10 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -117,6 +121,23 @@ function formatFecha(iso) {
   return isNaN(d) ? '' : d.toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' });
 }
 
+/* "hace 5 minutos", "ayer", "hace 2 meses"... */
+const relativo = new Intl.RelativeTimeFormat('es-AR', { numeric: 'auto' });
+const TRAMOS = [
+  ['year', 31536000], ['month', 2592000], ['week', 604800],
+  ['day', 86400], ['hour', 3600], ['minute', 60],
+];
+
+function fechaRelativa(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const seg = (Date.now() - d.getTime()) / 1000;
+  for (const [unidad, largo] of TRAMOS) {
+    if (Math.abs(seg) >= largo) return relativo.format(-Math.round(seg / largo), unidad);
+  }
+  return relativo.format(-Math.round(seg), 'second');
+}
+
 function esMia(nota) {
   return viajero && nota.autor &&
          nota.autor.trim().toLowerCase() === viajero.trim().toLowerCase();
@@ -149,7 +170,16 @@ const ring3d = {
   destellos: null,   // aura de sanacion (tomos propios)
   rayos: null,       // descargas electricas (tomos ajenos)
   hover: null,
+  composer: null,
+  // Arrastre e inercia
+  arrastrando: false,
+  ultimoX: 0,
+  recorrido: 0,
+  velocidad: 0,
+  zoom: 1,
 };
+
+const BLOOM = parametro('bloom', 1) > 0;
 
 /* ---------- Texturas generadas al vuelo -------------------------------- */
 
@@ -220,6 +250,51 @@ function texturaEstrella() {
   punta(-Math.PI / 4, 30, 2.5, 'rgba(150,255,180,.55)');
 
   const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* Cielo equirectangular sintetico: le da al oro de las tapas algo que
+   reflejar. Sin esto los materiales PBR quedan planos, porque la escena
+   solo tiene luces direccionales y nada alrededor. */
+function texturaEntorno() {
+  const cv = document.createElement('canvas');
+  cv.width = 512; cv.height = 256;
+  const c = cv.getContext('2d');
+
+  // Degradado vertical: noche abajo, aurora arriba
+  const g = c.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0,    '#0a1c2c');
+  g.addColorStop(0.34, '#12405a');
+  g.addColorStop(0.5,  '#1d6b76');
+  g.addColorStop(0.62, '#2a8f78');
+  g.addColorStop(0.8,  '#0d2436');
+  g.addColorStop(1,    '#050a12');
+  c.fillStyle = g;
+  c.fillRect(0, 0, 512, 256);
+
+  // Cintas de aurora difusas, para que los reflejos no sean uniformes
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 7; i++) {
+    const x = Math.random() * 512;
+    const w = 40 + Math.random() * 110;
+    const cinta = c.createLinearGradient(x, 0, x + w, 0);
+    cinta.addColorStop(0, 'rgba(70,227,154,0)');
+    cinta.addColorStop(0.5, `rgba(${90 + Math.random() * 60 | 0},235,${180 + Math.random() * 60 | 0},.5)`);
+    cinta.addColorStop(1, 'rgba(79,201,232,0)');
+    c.fillStyle = cinta;
+    c.fillRect(x, 20, w, 150);
+  }
+
+  // Un foco calido, que hace de luz principal en los reflejos
+  const foco = c.createRadialGradient(400, 90, 4, 400, 90, 90);
+  foco.addColorStop(0, 'rgba(255,228,170,.95)');
+  foco.addColorStop(1, 'rgba(255,228,170,0)');
+  c.fillStyle = foco;
+  c.fillRect(310, 0, 180, 180);
+
+  const t = new THREE.CanvasTexture(cv);
+  t.mapping = THREE.EquirectangularReflectionMapping;
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -325,13 +400,22 @@ function initEscena() {
   ring3d.camera.position.set(0, 2.2, 14);
   ring3d.camera.lookAt(0, 0, 0);
 
-  ring3d.scene.add(new THREE.HemisphereLight(0x9fe8ff, 0x101c26, 1.25));
+  // Environment map: reflejos para el oro repujado de las tapas
+  const pmrem = new THREE.PMREMGenerator(ring3d.renderer);
+  pmrem.compileEquirectangularShader();
+  const entorno = texturaEntorno();
+  ring3d.scene.environment = pmrem.fromEquirectangular(entorno).texture;
+  ring3d.scene.environmentIntensity = 0.85;
+  entorno.dispose();
+  pmrem.dispose();
 
-  const key = new THREE.DirectionalLight(0xffe3ad, 2.1);
+  ring3d.scene.add(new THREE.HemisphereLight(0x9fe8ff, 0x101c26, 0.9));
+
+  const key = new THREE.DirectionalLight(0xffe3ad, 1.7);
   key.position.set(3, 5, 4);
   ring3d.scene.add(key);
 
-  const rim = new THREE.DirectionalLight(0x66e0c0, 1.1);
+  const rim = new THREE.DirectionalLight(0x66e0c0, 0.9);
   rim.position.set(-4, 2, -3);
   ring3d.scene.add(rim);
 
@@ -348,12 +432,34 @@ function initEscena() {
   ring3d.rayos = crearRayos();
   ring3d.grupo.add(ring3d.destellos, ring3d.rayos);
 
+  // Bloom: hace que los destellos, los rayos y el oro tengan halo real.
+  // Se puede apagar con ?bloom=0 si el equipo va justo de rendimiento.
+  if (BLOOM) {
+    ring3d.composer = new EffectComposer(ring3d.renderer);
+    ring3d.composer.addPass(new RenderPass(ring3d.scene, ring3d.camera));
+
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(1, 1),
+      0.55,  // fuerza
+      0.5,   // radio
+      0.72   // umbral: solo lo mas brillante genera halo
+    );
+    ring3d.composer.addPass(bloom);
+    ring3d.composer.addPass(new OutputPass());
+  }
+
   redimensionar();
   window.addEventListener('resize', redimensionar);
 
-  els.canvas.addEventListener('pointerdown', alClickearCanvas);
+  els.canvas.addEventListener('pointerdown', alBajarPuntero);
   els.canvas.addEventListener('pointermove', alMoverPuntero);
-  els.canvas.addEventListener('pointerleave', () => ring3d.puntero.set(999, 999));
+  els.canvas.addEventListener('pointerup', alSoltarPuntero);
+  els.canvas.addEventListener('pointercancel', alSoltarPuntero);
+  els.canvas.addEventListener('pointerleave', () => {
+    ring3d.puntero.set(999, 999);
+    ring3d.arrastrando = false;
+  });
+  els.canvas.addEventListener('wheel', alRodar, { passive: false });
 
   ring3d.renderer.setAnimationLoop(animar);
   ring3d.ok = true;
@@ -364,6 +470,7 @@ function redimensionar() {
   const w = els.stage.clientWidth, h = els.stage.clientHeight;
   if (!w || !h) return;
   ring3d.renderer.setSize(w, h, false);
+  ring3d.composer?.setSize(w, h);
   ring3d.camera.aspect = w / h;
   ring3d.camera.updateProjectionMatrix();
   encuadrarCamara();
@@ -601,7 +708,7 @@ function encuadrarCamara() {
   if (!ring3d.camera) return;
   const fov = THREE.MathUtils.degToRad(ring3d.camera.fov);
   const necesaria = (ring3d.radio + 1.1) / Math.tan(fov / 2);
-  const dist = Math.max(9, necesaria / Math.min(1, ring3d.camera.aspect * 0.9));
+  const dist = Math.max(9, necesaria / Math.min(1, ring3d.camera.aspect * 0.9)) * ring3d.zoom;
   ring3d.camera.position.set(0, dist * 0.16, dist);
   ring3d.camera.lookAt(0, 0, 0);
 }
@@ -612,6 +719,15 @@ function alMoverPuntero(e) {
   const r = els.canvas.getBoundingClientRect();
   ring3d.puntero.x = ((e.clientX - r.left) / r.width) * 2 - 1;
   ring3d.puntero.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+
+  if (ring3d.arrastrando) {
+    const dx = e.clientX - ring3d.ultimoX;
+    ring3d.ultimoX = e.clientX;
+    ring3d.recorrido += Math.abs(dx);
+    // La velocidad queda guardada para que la ronda siga girando al soltar
+    ring3d.velocidad = dx * 0.006;
+    ring3d.grupo.rotation.y += ring3d.velocidad;
+  }
 }
 
 /* Resuelve que tomo esta bajo el puntero y enciende el efecto que
@@ -628,7 +744,7 @@ function actualizarHover() {
 
   if (encontrado === ring3d.hover) return;
   ring3d.hover = encontrado;
-  els.canvas.style.cursor = encontrado ? 'pointer' : 'default';
+  if (!ring3d.arrastrando) els.canvas.style.cursor = encontrado ? 'pointer' : 'grab';
 
   const { destellos, rayos } = ring3d;
   destellos.visible = false;
@@ -657,8 +773,36 @@ function actualizarHover() {
   }
 }
 
-function alClickearCanvas(e) {
-  if (!ring3d.ok || !ring3d.tomos.length) return;
+/* El puntero cumple dos funciones: arrastrar la ronda y abrir un tomo.
+   Se distinguen por cuanto se movio entre apretar y soltar. */
+
+const UMBRAL_ARRASTRE = 6; // px; por debajo de esto cuenta como click
+
+function alBajarPuntero(e) {
+  if (!ring3d.ok) return;
+  ring3d.arrastrando = true;
+  ring3d.ultimoX = e.clientX;
+  ring3d.recorrido = 0;
+  ring3d.velocidad = 0;
+  els.canvas.setPointerCapture?.(e.pointerId);
+  els.canvas.style.cursor = 'grabbing';
+}
+
+function alSoltarPuntero(e) {
+  if (!ring3d.arrastrando) return;
+  ring3d.arrastrando = false;
+  els.canvas.releasePointerCapture?.(e.pointerId);
+  els.canvas.style.cursor = ring3d.hover ? 'pointer' : 'grab';
+
+  // Movimiento corto: era un click, no un arrastre
+  if (ring3d.recorrido < UMBRAL_ARRASTRE) {
+    ring3d.velocidad = 0;
+    abrirTomoBajoPuntero(e);
+  }
+}
+
+function abrirTomoBajoPuntero(e) {
+  if (!ring3d.tomos.length) return;
   alMoverPuntero(e);
   ring3d.raycaster.setFromCamera(ring3d.puntero, ring3d.camera);
 
@@ -670,13 +814,30 @@ function alClickearCanvas(e) {
   if (t) abrirTomo(t.nota);
 }
 
+/* Rueda del mouse: acerca o aleja la camara, dentro de un rango acotado */
+function alRodar(e) {
+  if (!ring3d.ok) return;
+  e.preventDefault();
+  ring3d.zoom = THREE.MathUtils.clamp(ring3d.zoom * (e.deltaY > 0 ? 1.08 : 0.926), 0.55, 2.2);
+  encuadrarCamara();
+}
+
 /* ---------- Bucle de animacion ------------------------------------------ */
 
 function animar() {
   const dt = Math.min(ring3d.reloj.getDelta(), 0.05);
   const t = ring3d.reloj.getElapsedTime();
 
-  if (!ring3d.pausado) ring3d.grupo.rotation.y += dt * 0.14;
+  if (ring3d.arrastrando) {
+    // Mientras se arrastra manda el puntero; no se suma giro automatico
+  } else if (Math.abs(ring3d.velocidad) > 0.0002) {
+    // Inercia: sigue girando y frena de a poco
+    ring3d.grupo.rotation.y += ring3d.velocidad;
+    ring3d.velocidad *= 0.94;
+  } else if (!ring3d.pausado) {
+    ring3d.velocidad = 0;
+    ring3d.grupo.rotation.y += dt * 0.14;
+  }
 
   actualizarHover();
 
@@ -702,7 +863,8 @@ function animar() {
   animarDestellos(dt, t);
   animarRayos(dt);
 
-  ring3d.renderer.render(ring3d.scene, ring3d.camera);
+  if (ring3d.composer) ring3d.composer.render();
+  else ring3d.renderer.render(ring3d.scene, ring3d.camera);
 }
 
 function animarDestellos(dt, t) {
@@ -816,7 +978,7 @@ function pintarEstante(contenedor, lista) {
     btn.className = 'tome';
     btn.dataset.id = String(nota.id);
     btn.textContent = tituloDe(nota, 32);
-    btn.title = `${tituloDe(nota, 80)} — ${nota.autor} — ${formatFecha(nota.fecha_creacion)}`;
+    btn.title = `${tituloDe(nota, 80)} — ${nota.autor} — ${fechaRelativa(nota.fecha_creacion)}`;
     btn.addEventListener('click', () => abrirTomo(nota));
     contenedor.appendChild(btn);
   });
@@ -876,9 +1038,23 @@ function atenuar(tomo, apagar) {
 function abrirTomo(nota) {
   els.reader.querySelector('.reader-tome-title').textContent = tituloDe(nota, 120);
   els.reader.querySelector('.reader-author').textContent = nota.autor || 'Viajero anonimo';
-  els.reader.querySelector('.reader-date').textContent   = formatFecha(nota.fecha_creacion);
+  const fecha = els.reader.querySelector('.reader-date');
+  fecha.textContent = fechaRelativa(nota.fecha_creacion);
+  fecha.title = formatFecha(nota.fecha_creacion);
   els.reader.querySelector('.reader-id').textContent     = `Tomo n.º ${nota.id}`;
   els.reader.querySelector('.reader-text').textContent   = nota.texto || '';
+
+  // Solo el autor puede quemar su propio tomo
+  const borrar = els.reader.querySelector('.reader-burn');
+  if (esMia(nota)) {
+    borrar.hidden = false;
+    borrar.textContent = 'Quemar el tomo';
+    borrar.classList.remove('is-confirming');
+    borrar.onclick = () => confirmarBorrado(nota, borrar);
+  } else {
+    borrar.hidden = true;
+    borrar.onclick = null;
+  }
 
   els.reader.hidden = false;
   sonidoPagina();
@@ -886,6 +1062,52 @@ function abrirTomo(nota) {
 }
 
 function cerrarTomo() { els.reader.hidden = true; }
+
+/* Confirmacion en dos pasos dentro del mismo boton, para no sacar al
+   lector de la escena con un dialogo del navegador. */
+function confirmarBorrado(nota, boton) {
+  if (!boton.classList.contains('is-confirming')) {
+    boton.classList.add('is-confirming');
+    boton.textContent = '¿Seguro? Volve a pulsar';
+    setTimeout(() => {
+      if (boton.classList.contains('is-confirming')) {
+        boton.classList.remove('is-confirming');
+        boton.textContent = 'Quemar el tomo';
+      }
+    }, 4000);
+    return;
+  }
+  borrarNota(nota, boton);
+}
+
+async function borrarNota(nota, boton) {
+  boton.disabled = true;
+  boton.textContent = 'Ardiendo...';
+  try {
+    const res = await fetch(`/api/notas/${nota.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ autor: viajero }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'El tomo no pudo quemarse.');
+    }
+    cerrarTomo();
+    els.status.textContent = 'El tomo ardio y ya no esta en la biblioteca.';
+    els.status.classList.add('is-good');
+    els.status.classList.remove('is-error');
+    await cargarNotas();
+  } catch (err) {
+    boton.textContent = err.message;
+    els.status.textContent = err.message;
+    els.status.classList.add('is-error');
+    els.status.classList.remove('is-good');
+  } finally {
+    boton.disabled = false;
+    boton.classList.remove('is-confirming');
+  }
+}
 
 els.reader.addEventListener('click', (e) => {
   if (e.target.hasAttribute('data-close')) cerrarTomo();

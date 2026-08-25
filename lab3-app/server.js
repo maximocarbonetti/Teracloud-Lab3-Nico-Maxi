@@ -134,6 +134,47 @@ app.post('/api/notas', async (req, res) => {
   }
 });
 
+// --- API: borrar nota ---
+// No hay sistema de login, asi que la unica validacion posible es que el
+// autor que envia el pedido coincida con el que figura en la fila. No es
+// seguridad real (cualquiera podria mandar otro nombre), pero evita el
+// borrado accidental de notas ajenas desde la interfaz.
+app.delete('/api/notas/:id', async (req, res) => {
+  // Primero la forma del pedido, despues el estado de la base: asi un
+  // pedido malformado recibe un 400 claro aunque MySQL este arrancando.
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Ese tomo no existe en la biblioteca.' });
+  }
+
+  const autor = (req.body?.autor || '').trim();
+  if (!autor) {
+    return res.status(400).json({ error: 'Falta saber quien pide quemar el tomo.' });
+  }
+
+  if (!dbReady) {
+    return res.status(503).json({ error: 'El salon todavia no abrio sus puertas.' });
+  }
+
+  try {
+    const [filas] = await pool.query('SELECT autor FROM notas WHERE id = ?', [id]);
+    if (!filas.length) {
+      return res.status(404).json({ error: 'Ese tomo ya no esta en la biblioteca.' });
+    }
+
+    if (filas[0].autor.trim().toLowerCase() !== autor.toLowerCase()) {
+      return res.status(403).json({ error: 'Solo quien escribio el tomo puede quemarlo.' });
+    }
+
+    await pool.query('DELETE FROM notas WHERE id = ?', [id]);
+    console.log(`[api] Nota ${id} borrada por ${autor}.`);
+    res.json({ id, borrada: true });
+  } catch (err) {
+    console.error('[api] Error al borrar nota:', err.message);
+    res.status(500).json({ error: 'El tomo se resiste a arder.' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`[server] Sovngarde Notes escuchando en el puerto ${PORT}`);
 });
