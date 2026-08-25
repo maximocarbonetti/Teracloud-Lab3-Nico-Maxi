@@ -143,7 +143,6 @@ const ring3d = {
   tomos: [],
   raycaster: new THREE.Raycaster(),
   puntero: new THREE.Vector2(),
-  punteroSucio: false,
   reloj: new THREE.Clock(),
   pausado: false,
   radio: 3,
@@ -354,10 +353,7 @@ function initEscena() {
 
   els.canvas.addEventListener('pointerdown', alClickearCanvas);
   els.canvas.addEventListener('pointermove', alMoverPuntero);
-  els.canvas.addEventListener('pointerleave', () => {
-    ring3d.puntero.set(999, 999);
-    ring3d.punteroSucio = true;
-  });
+  els.canvas.addEventListener('pointerleave', () => ring3d.puntero.set(999, 999));
 
   ring3d.renderer.setAnimationLoop(animar);
   ring3d.ok = true;
@@ -375,7 +371,7 @@ function redimensionar() {
 
 /* Centra, orienta y escala un modelo recien cargado. El eje mas delgado
    pasa a ser Z, asi la tapa mira hacia afuera de la ronda. */
-function normalizarModelo(gltfScene, diagonalObjetivo = 2.0) {
+function normalizarModelo(gltfScene, radioObjetivo = 1.1, factor = 1) {
   const contenedor = new THREE.Group();
   const interno = new THREE.Group();
   interno.add(gltfScene);
@@ -396,10 +392,11 @@ function normalizarModelo(gltfScene, diagonalObjetivo = 2.0) {
 
   interno.position.sub(centro);
 
-  // Escalar por la diagonal de la tapa y no solo por el alto: los modelos
-  // tienen proporciones distintas y normalizar por un solo eje hacia que
-  // uno se viera mas chico que el otro.
-  const escala = diagonalObjetivo / Math.hypot(tam2.x, tam2.y);
+  // Escalar por el radio de la esfera envolvente: iguala el "bulto" total
+  // de cada modelo sin importar sus proporciones. El factor permite ajustar
+  // a ojo si un modelo igual se sigue viendo mas chico.
+  const radio = 0.5 * Math.hypot(tam2.x, tam2.y, tam2.z);
+  const escala = (radioObjetivo / radio) * factor;
   contenedor.scale.setScalar(escala);
   contenedor.userData.tamano = tam2.clone().multiplyScalar(escala);
   return contenedor;
@@ -412,8 +409,12 @@ async function cargarModelos() {
     cargar('models/tome-mine.glb'),
     cargar('models/tome-others.glb'),
   ]);
-  ring3d.modelos.mine = normalizarModelo(mine.scene);
-  ring3d.modelos.others = normalizarModelo(others.scene);
+  ring3d.modelos.mine = normalizarModelo(mine.scene, 1.1, 1);
+  // El modelo ajeno es mas angosto que el propio (90% del ancho, aunque
+  // igual area de tapa). Se le da un empujon chico para emparejar el ancho
+  // sin estirarlo de mas: con factores mayores queda desproporcionadamente
+  // alto. Subir o bajar este numero es la forma de ajustarlo a ojo.
+  ring3d.modelos.others = normalizarModelo(others.scene, 1.1, 1.05);
 }
 
 /* Rotulo con titulo y autor, dibujado en canvas y pegado sobre la tapa */
@@ -481,7 +482,17 @@ function instanciarTomo(nota) {
   halo.visible = false;
   obj.add(halo);
 
-  return { obj, materiales, tam, halo };
+  // Caja de colision del tamano exacto del libro. Va suelta en la ronda
+  // (no como hija del tomo) para no heredar su escala, y es lo unico
+  // contra lo que se lanza el rayo del puntero: asi el area sensible no
+  // incluye el halo ni el rotulo, y ademas el calculo es 12 triangulos
+  // en vez de los 35.000 del modelo.
+  const hit = new THREE.Mesh(
+    new THREE.BoxGeometry(tam.x, tam.y, tam.z),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+
+  return { obj, materiales, tam, halo, hit };
 }
 
 function construirRonda() {
@@ -489,6 +500,11 @@ function construirRonda() {
 
   for (const t of ring3d.tomos) {
     ring3d.grupo.remove(t.obj);
+    if (t.hit) {
+      ring3d.grupo.remove(t.hit);
+      t.hit.geometry.dispose();
+      t.hit.material.dispose();
+    }
     t.obj.traverse((n) => {
       if (n.isMesh) {
         n.geometry?.dispose?.();
@@ -523,9 +539,13 @@ function construirRonda() {
     inst.obj.rotation.y = ang;
     inst.obj.userData.notaId = String(nota.id);
 
-    ring3d.grupo.add(inst.obj);
+    inst.hit.position.copy(inst.obj.position);
+    inst.hit.rotation.y = ang;
+    inst.hit.userData.notaId = String(nota.id);
+
+    ring3d.grupo.add(inst.obj, inst.hit);
     ring3d.tomos.push({
-      nota, obj: inst.obj, materiales: inst.materiales,
+      nota, obj: inst.obj, hit: inst.hit, materiales: inst.materiales,
       halo: inst.halo, tam: inst.tam, resaltado: false,
     });
   });
@@ -549,23 +569,18 @@ function alMoverPuntero(e) {
   const r = els.canvas.getBoundingClientRect();
   ring3d.puntero.x = ((e.clientX - r.left) / r.width) * 2 - 1;
   ring3d.puntero.y = -((e.clientY - r.top) / r.height) * 2 + 1;
-  ring3d.punteroSucio = true;
 }
 
 /* Resuelve que tomo esta bajo el puntero y enciende el efecto que
    corresponda: sanacion para los propios, rayos para los ajenos. */
 function actualizarHover() {
-  if (!ring3d.punteroSucio) return;
-  ring3d.punteroSucio = false;
-
   ring3d.raycaster.setFromCamera(ring3d.puntero, ring3d.camera);
-  const hits = ring3d.raycaster.intersectObjects(ring3d.tomos.map((t) => t.obj), true);
+  const hits = ring3d.raycaster.intersectObjects(ring3d.tomos.map((t) => t.hit), false);
 
   let encontrado = null;
   if (hits.length) {
-    let n = hits[0].object;
-    while (n && !n.userData.notaId) n = n.parent;
-    if (n) encontrado = ring3d.tomos.find((t) => String(t.nota.id) === n.userData.notaId) || null;
+    const id = hits[0].object.userData.notaId;
+    encontrado = ring3d.tomos.find((t) => String(t.nota.id) === id) || null;
   }
 
   if (encontrado === ring3d.hover) return;
@@ -604,14 +619,11 @@ function alClickearCanvas(e) {
   alMoverPuntero(e);
   ring3d.raycaster.setFromCamera(ring3d.puntero, ring3d.camera);
 
-  const hits = ring3d.raycaster.intersectObjects(ring3d.tomos.map((t) => t.obj), true);
+  const hits = ring3d.raycaster.intersectObjects(ring3d.tomos.map((t) => t.hit), false);
   if (!hits.length) return;
 
-  let n = hits[0].object;
-  while (n && !n.userData.notaId) n = n.parent;
-  if (!n) return;
-
-  const t = ring3d.tomos.find((x) => String(x.nota.id) === n.userData.notaId);
+  const id = hits[0].object.userData.notaId;
+  const t = ring3d.tomos.find((x) => String(x.nota.id) === id);
   if (t) abrirTomo(t.nota);
 }
 
@@ -628,6 +640,7 @@ function animar() {
   for (const tomo of ring3d.tomos) {
     const objetivo = tomo.resaltado ? 0.42 + Math.sin(t * 1.8) * 0.05 : 0;
     tomo.obj.position.y += (objetivo - tomo.obj.position.y) * Math.min(1, dt * 6);
+    if (tomo.hit) tomo.hit.position.y = tomo.obj.position.y;
 
     if (tomo.halo) {
       const meta = tomo.resaltado ? 0.55 + Math.sin(t * 2.4) * 0.14 : 0;
@@ -635,6 +648,12 @@ function animar() {
       m.opacity += (meta - m.opacity) * Math.min(1, dt * 5);
       tomo.halo.visible = m.opacity > 0.01;
     }
+  }
+
+  // El efecto acompana al tomo apuntado, incluso mientras este se eleva
+  if (ring3d.hover) {
+    const ef = esMia(ring3d.hover.nota) ? ring3d.destellos : ring3d.rayos;
+    ef.position.y = ring3d.hover.obj.position.y;
   }
 
   animarDestellos(dt, t);
@@ -901,11 +920,11 @@ els.search.addEventListener('input', aplicarBusqueda);
 
 /* ---------- Dragon: escupe fuego al hacerle click ------------------------ */
 
-const dragon = document.querySelector('.dragon');
+const dragonHit = document.querySelector('.dragon-hit');
 const dragonRig = document.querySelector('.dragon-rig');
 
-if (dragon && dragonRig) {
-  dragon.addEventListener('click', () => {
+if (dragonHit && dragonRig) {
+  dragonHit.addEventListener('click', () => {
     if (dragonRig.classList.contains('is-breathing')) return;
     dragonRig.classList.add('is-breathing');
     rugido();

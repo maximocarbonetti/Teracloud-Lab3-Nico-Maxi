@@ -145,7 +145,7 @@ body {
   position: fixed;
   top: 11vh;
   left: 0;
-  z-index: 3;
+  z-index: 7; /* por encima del buscador y las estanterias, para poder clickearlo */
   pointer-events: none;
   animation: fly-across 38s linear infinite;
 }
@@ -171,7 +171,13 @@ body {
   display: block;
   transform: scaleX(-1); /* la cabeza mira hacia donde vuela */
   filter: drop-shadow(0 0 14px rgba(70, 227, 154, .35));
-  pointer-events: auto;  /* se le puede hacer click para que escupa fuego */
+  pointer-events: none;  /* solo el area de click de abajo recibe el puntero */
+}
+
+/* Rectangulo transparente sobre el cuerpo: da un area de click continua */
+.dragon-hit {
+  fill: transparent;
+  pointer-events: all;
   cursor: pointer;
 }
 
