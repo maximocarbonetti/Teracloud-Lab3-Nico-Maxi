@@ -371,7 +371,10 @@ function redimensionar() {
 
 /* Centra, orienta y escala un modelo recien cargado. El eje mas delgado
    pasa a ser Z, asi la tapa mira hacia afuera de la ronda. */
-function normalizarModelo(gltfScene, radioObjetivo = 1.1, factor = 1) {
+const TAPA_ANCHO = 1.40;
+const TAPA_ALTO  = 1.60;
+
+function normalizarModelo(gltfScene) {
   const contenedor = new THREE.Group();
   const interno = new THREE.Group();
   interno.add(gltfScene);
@@ -392,13 +395,21 @@ function normalizarModelo(gltfScene, radioObjetivo = 1.1, factor = 1) {
 
   interno.position.sub(centro);
 
-  // Escalar por el radio de la esfera envolvente: iguala el "bulto" total
-  // de cada modelo sin importar sus proporciones. El factor permite ajustar
-  // a ojo si un modelo igual se sigue viendo mas chico.
-  const radio = 0.5 * Math.hypot(tam2.x, tam2.y, tam2.z);
-  const escala = (radioObjetivo / radio) * factor;
-  contenedor.scale.setScalar(escala);
-  contenedor.userData.tamano = tam2.clone().multiplyScalar(escala);
+  // Escala independiente por eje: los dos modelos tienen proporciones
+  // nativas distintas (el ajeno es 10% mas angosto y 10% mas alto), asi que
+  // cualquier escala uniforme deja uno mas chico que el otro. Escalando X e
+  // Y por separado las dos tapas quedan exactamente del mismo tamano en
+  // pantalla; la deformacion es de ~10% y no se nota.
+  // El escalado va en el contenedor, que no tiene rotacion propia, asi que
+  // se aplica sobre el libro ya orientado y no lo deforma en diagonal.
+  const sx = TAPA_ANCHO / tam2.x;
+  const sy = TAPA_ALTO  / tam2.y;
+  const sz = (sx + sy) / 2;   // el grosor sigue el promedio, sin achatarse
+  contenedor.scale.set(sx, sy, sz);
+
+  contenedor.userData.tamano = new THREE.Vector3(
+    tam2.x * sx, tam2.y * sy, tam2.z * sz
+  );
   return contenedor;
 }
 
@@ -409,12 +420,8 @@ async function cargarModelos() {
     cargar('models/tome-mine.glb'),
     cargar('models/tome-others.glb'),
   ]);
-  ring3d.modelos.mine = normalizarModelo(mine.scene, 1.1, 1);
-  // El modelo ajeno es mas angosto que el propio (90% del ancho, aunque
-  // igual area de tapa). Se le da un empujon chico para emparejar el ancho
-  // sin estirarlo de mas: con factores mayores queda desproporcionadamente
-  // alto. Subir o bajar este numero es la forma de ajustarlo a ojo.
-  ring3d.modelos.others = normalizarModelo(others.scene, 1.1, 1.05);
+  ring3d.modelos.mine = normalizarModelo(mine.scene);
+  ring3d.modelos.others = normalizarModelo(others.scene);
 }
 
 /* Rotulo con titulo y autor, dibujado en canvas y pegado sobre la tapa */
@@ -920,16 +927,21 @@ els.search.addEventListener('input', aplicarBusqueda);
 
 /* ---------- Dragon: escupe fuego al hacerle click ------------------------ */
 
-const dragonHit = document.querySelector('.dragon-hit');
+const dragonSvg = document.querySelector('.dragon');
 const dragonRig = document.querySelector('.dragon-rig');
 
-if (dragonHit && dragonRig) {
-  dragonHit.addEventListener('click', () => {
-    if (dragonRig.classList.contains('is-breathing')) return;
-    dragonRig.classList.add('is-breathing');
-    rugido();
-    setTimeout(() => dragonRig.classList.remove('is-breathing'), 1100);
-  });
+function soplarFuego() {
+  if (!dragonRig || dragonRig.classList.contains('is-breathing')) return;
+  dragonRig.classList.add('is-breathing');
+  rugido();
+  setTimeout(() => dragonRig.classList.remove('is-breathing'), 1100);
+}
+
+// Se escucha en el svg entero (no solo en el rectangulo invisible) para que
+// tambien cuente el click sobre los pixeles del propio dragon.
+if (dragonSvg) {
+  dragonSvg.addEventListener('click', soplarFuego);
+  dragonSvg.addEventListener('touchstart', (e) => { e.preventDefault(); soplarFuego(); }, { passive: false });
 }
 
 /* ---------- Arranque ----------------------------------------------------- */

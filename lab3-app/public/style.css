@@ -171,14 +171,20 @@ body {
   display: block;
   transform: scaleX(-1); /* la cabeza mira hacia donde vuela */
   filter: drop-shadow(0 0 14px rgba(70, 227, 154, .35));
-  pointer-events: none;  /* solo el area de click de abajo recibe el puntero */
+  /* El contenedor .dragon-flight tiene pointer-events:none para no tapar la
+     interfaz; se rehabilita aca, en el svg, para poder clickear el dragon.
+     Antes estaba en "none" y eso anulaba el subarbol entero: en varios
+     navegadores el hijo ya no puede volver a activarse. */
+  pointer-events: auto;
+  cursor: pointer;
 }
 
-/* Rectangulo transparente sobre el cuerpo: da un area de click continua */
+/* Rectangulo transparente sobre el cuerpo: da un area de click continua,
+   porque el pixel art tiene mas huecos que relleno y por defecto el SVG
+   solo responde sobre los pixeles pintados. */
 .dragon-hit {
   fill: transparent;
   pointer-events: all;
-  cursor: pointer;
 }
 
 /* --- Llamarada en pixel art --- */
