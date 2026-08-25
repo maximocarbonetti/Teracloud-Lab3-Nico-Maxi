@@ -256,12 +256,8 @@ body {
   to   { transform: rotate(5deg);  }
 }
 
-.banner-img { max-width: 100%; max-height: 40px; display: block; }
-.banner-img.is-missing { display: none; }
-.banner-img.is-missing + .banner-fallback { display: block; }
-
 .banner-fallback {
-  display: none;
+  display: block;
   font-family: "Cinzel", serif;
   font-size: .72rem;
   letter-spacing: .06em;

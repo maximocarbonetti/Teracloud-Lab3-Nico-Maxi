@@ -374,7 +374,17 @@ function redimensionar() {
 const TAPA_ANCHO = 1.40;
 const TAPA_ALTO  = 1.60;
 
-function normalizarModelo(gltfScene) {
+/* Ajuste extra del modelo ajeno.
+   Las medidas dicen que las dos tapas quedan del mismo tamano, pero en
+   pantalla el tomo ajeno se sigue leyendo mas chico, asi que se lo agranda
+   directamente. Se puede probar otro valor en vivo agregando ?escala=1.6 a
+   la URL, sin redesplegar, y despues fijarlo aca. */
+const AJUSTE_OTROS = (() => {
+  const v = Number(new URLSearchParams(location.search).get('escala'));
+  return Number.isFinite(v) && v > 0 ? v : 1.45;
+})();
+
+function normalizarModelo(gltfScene, ajuste = 1) {
   const contenedor = new THREE.Group();
   const interno = new THREE.Group();
   interno.add(gltfScene);
@@ -402,8 +412,8 @@ function normalizarModelo(gltfScene) {
   // pantalla; la deformacion es de ~10% y no se nota.
   // El escalado va en el contenedor, que no tiene rotacion propia, asi que
   // se aplica sobre el libro ya orientado y no lo deforma en diagonal.
-  const sx = TAPA_ANCHO / tam2.x;
-  const sy = TAPA_ALTO  / tam2.y;
+  const sx = (TAPA_ANCHO / tam2.x) * ajuste;
+  const sy = (TAPA_ALTO  / tam2.y) * ajuste;
   const sz = (sx + sy) / 2;   // el grosor sigue el promedio, sin achatarse
   contenedor.scale.set(sx, sy, sz);
 
@@ -420,8 +430,18 @@ async function cargarModelos() {
     cargar('models/tome-mine.glb'),
     cargar('models/tome-others.glb'),
   ]);
-  ring3d.modelos.mine = normalizarModelo(mine.scene);
-  ring3d.modelos.others = normalizarModelo(others.scene);
+  ring3d.modelos.mine = normalizarModelo(mine.scene, 1);
+  ring3d.modelos.others = normalizarModelo(others.scene, AJUSTE_OTROS);
+
+  // Diagnostico: deja los tamanos medidos a la vista en la consola, para
+  // poder comparar lo que calcula el codigo con lo que se ve en pantalla.
+  const medir = (m, nombre) => {
+    const t = m.userData.tamano;
+    console.log(`[tomo] ${nombre}: ancho ${t.x.toFixed(3)}  alto ${t.y.toFixed(3)}  grosor ${t.z.toFixed(3)}`);
+  };
+  medir(ring3d.modelos.mine, 'propio');
+  medir(ring3d.modelos.others, `ajeno (ajuste ${AJUSTE_OTROS})`);
+  window.__sovngarde = ring3d;
 }
 
 /* Rotulo con titulo y autor, dibujado en canvas y pegado sobre la tapa */
