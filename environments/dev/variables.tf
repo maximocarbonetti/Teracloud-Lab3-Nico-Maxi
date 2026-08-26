@@ -142,3 +142,29 @@ variable "notification_emails" {
   description = "Emails que reciben el estado del pipeline y las alarmas"
   type        = list(string)
 }
+
+variable "enable_manual_approval" {
+  description = "Exigir aprobacion manual entre el build y el despliegue al servicio ECS"
+  type        = bool
+  default     = true
+}
+
+# ---- Objetivos de nivel de servicio (SLO) ----
+
+variable "slo_error_rate_pct" {
+  description = "Porcentaje maximo de peticiones con error 5xx admitido. 1% equivale a un SLO de exito del 99%."
+  type        = number
+  default     = 1
+}
+
+variable "slo_latency_p99_seconds" {
+  description = "Latencia maxima admitida para el percentil 99, en segundos."
+  type        = number
+  default     = 2
+}
+
+variable "frontend_desired_count" {
+  description = "Cantidad de tasks del frontend. El enunciado exige 2."
+  type        = number
+  default     = 2
+}

@@ -3,13 +3,13 @@
 module "network" {
   source = "../../modules/network"
 
-  project_name          = var.project_name
-  environment           = var.environment
-  vpc_cidr              = var.vpc_cidr
-  azs                   = var.azs
-  public_subnet_cidrs   = var.public_subnet_cidrs
-  private_subnet_cidrs  = var.private_subnet_cidrs
-  extra_tags            = local.common_tags
+  project_name         = var.project_name
+  environment          = var.environment
+  vpc_cidr             = var.vpc_cidr
+  azs                  = var.azs
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  private_subnet_cidrs = var.private_subnet_cidrs
+  extra_tags           = local.common_tags
 }
 
 module "security_groups" {
@@ -38,12 +38,12 @@ module "ecs_cluster" {
     module.security_groups.ecs_mysql_sg_id,
   ]
 
-  instance_type     = var.ecs_instance_type
-  min_size          = var.ecs_min_size
-  max_size          = var.ecs_max_size
-  desired_capacity  = var.ecs_desired_capacity
-  key_name          = var.ec2_key_name
-  tags              = local.common_tags
+  instance_type    = var.ecs_instance_type
+  min_size         = var.ecs_min_size
+  max_size         = var.ecs_max_size
+  desired_capacity = var.ecs_desired_capacity
+  key_name         = var.ec2_key_name
+  tags             = local.common_tags
 }
 
 # dns crea/busca la hosted zone (para acm) y, ademas, el record final que
@@ -70,12 +70,12 @@ module "acm" {
 module "alb" {
   source = "../../modules/alb"
 
-  name                = "${local.name_prefix}-alb"
-  vpc_id              = module.network.vpc_id
-  subnet_ids          = module.network.public_subnet_ids
-  security_group_ids  = [module.security_groups.alb_sg_id]
-  certificate_arn     = module.acm.certificate_arn
-  tags                = local.common_tags
+  name               = "${local.name_prefix}-alb"
+  vpc_id             = module.network.vpc_id
+  subnet_ids         = module.network.public_subnet_ids
+  security_group_ids = [module.security_groups.alb_sg_id]
+  certificate_arn    = module.acm.certificate_arn
+  tags               = local.common_tags
 }
 
 module "efs" {
@@ -116,6 +116,7 @@ module "ecs_service" {
 
   frontend_image            = "${module.ecr.repository_url}:${var.frontend_image_tag}"
   frontend_target_group_arn = module.alb.frontend_target_group_arn
+  frontend_desired_count    = var.frontend_desired_count
 
   frontend_secrets = {
     DB_HOST     = module.ssm_parameters.db_host_arn
@@ -158,24 +159,36 @@ module "observability" {
   name_prefix            = local.name_prefix
   cluster_name           = module.ecs_cluster.cluster_name
   frontend_service_name  = module.ecs_service.frontend_service_name
+  frontend_desired_count = var.frontend_desired_count
   mysql_service_name     = module.ecs_service.mysql_service_name
   alb_arn                = module.alb.alb_arn
   target_group_arn       = module.alb.frontend_target_group_arn
+  efs_file_system_id     = module.efs.file_system_id
   sns_topic_arn          = module.notifications.topic_arn
-  tags                   = local.common_tags
+
+  # Objetivos de nivel de servicio del entorno
+  slo_error_rate_pct      = var.slo_error_rate_pct
+  slo_latency_p99_seconds = var.slo_latency_p99_seconds
+
+  tags = local.common_tags
 }
 
 module "cicd" {
   source = "../../modules/cicd"
 
-  name_prefix           = local.name_prefix
-  github_repository_id  = var.github_repository_id
-  github_branch         = var.github_branch
-  ecr_repository_url    = module.ecr.repository_url
-  ecr_repository_arn    = module.ecr.repository_arn
-  ecs_cluster_name      = module.ecs_cluster.cluster_name
-  ecs_service_name      = module.ecs_service.frontend_service_name
-  container_name        = "frontend"
-  sns_topic_arn         = module.notifications.topic_arn
-  tags                  = local.common_tags
+  name_prefix          = local.name_prefix
+  github_repository_id = var.github_repository_id
+  github_branch        = var.github_branch
+  ecr_repository_url   = module.ecr.repository_url
+  ecr_repository_arn   = module.ecr.repository_arn
+  ecs_cluster_name     = module.ecs_cluster.cluster_name
+  ecs_service_name     = module.ecs_service.frontend_service_name
+  container_name       = "frontend"
+  sns_topic_arn        = module.notifications.topic_arn
+
+  # Compuerta de aprobacion manual antes del deploy
+  enable_manual_approval = var.enable_manual_approval
+  approval_review_url    = "https://${var.app_record_name}/"
+
+  tags = local.common_tags
 }

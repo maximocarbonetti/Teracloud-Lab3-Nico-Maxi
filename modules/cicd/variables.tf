@@ -55,6 +55,24 @@ variable "sns_topic_arn" {
   type        = string
 }
 
+variable "enable_manual_approval" {
+  description = <<-EOT
+    Agrega una etapa de aprobacion manual entre Build y Deploy. Al llegar a ella
+    el pipeline notifica por SNS y queda en espera hasta que alguien apruebe o
+    rechace desde la consola de CodePipeline. La imagen ya esta publicada en ECR
+    en ese punto: lo unico que la aprobacion controla es el momento en que se
+    actualiza el servicio ECS.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "approval_review_url" {
+  description = "URL que se muestra al aprobador como referencia para revisar antes de decidir (por ejemplo, el entorno desplegado)."
+  type        = string
+  default     = null
+}
+
 variable "enable_pipeline_notifications" {
   description = <<-EOT
     Crea la notification rule del pipeline. La primera vez que se crea una en
