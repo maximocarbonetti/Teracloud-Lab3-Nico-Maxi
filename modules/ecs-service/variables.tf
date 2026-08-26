@@ -80,8 +80,15 @@ variable "frontend_environment" {
 # ---- MySQL ----
 
 variable "mysql_image" {
-  type    = string
-  default = "mysql:8.0"
+  description = <<-EOT
+    Imagen de MySQL. Se apunta al mirror oficial de Docker Official Images en
+    ECR Public en lugar de Docker Hub: las instancias EC2 del cluster salen a
+    internet por el NAT con IP compartida de AWS, y Docker Hub limita los pulls
+    anonimos a 100 cada 6 horas por IP, cuota que suele estar agotada. El mirror
+    no tiene ese limite desde dentro de AWS y ademas resuelve local a la region.
+  EOT
+  type        = string
+  default     = "public.ecr.aws/docker/library/mysql:8.0"
 }
 
 variable "mysql_port" {

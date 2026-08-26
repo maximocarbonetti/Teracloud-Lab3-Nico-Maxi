@@ -4,6 +4,12 @@ resource "aws_ecr_repository" "this" {
   name                 = var.repository_name
   image_tag_mutability = var.image_tag_mutability
 
+  # Por defecto ECR rechaza borrar un repositorio que tenga imagenes
+  # (RepositoryNotEmptyException), lo que deja el terraform destroy trabado a
+  # mitad de camino. Con esto el ciclo destroy/apply queda reproducible sin
+  # pasos manuales, que es justo lo que exige el enunciado.
+  force_delete = var.force_delete
+
   image_scanning_configuration {
     scan_on_push = var.scan_on_push
   }

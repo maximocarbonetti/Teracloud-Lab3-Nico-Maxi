@@ -43,3 +43,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "force_delete" {
+  description = "Permite destruir el repositorio aunque contenga imagenes. Necesario para que el ciclo destroy/apply sea reproducible sin intervencion manual."
+  type        = bool
+  default     = true
+}
