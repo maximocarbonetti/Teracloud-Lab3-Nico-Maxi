@@ -21,7 +21,7 @@ variable "github_branch" {
 variable "buildspec_path" {
   description = "Path del buildspec.yml dentro del repo"
   type        = string
-  default     = "lab3-app/buildspec.yml"
+  default     = "buildspec.yml"
 }
 
 variable "ecr_repository_url" {

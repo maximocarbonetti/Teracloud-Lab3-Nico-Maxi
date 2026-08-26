@@ -204,6 +204,18 @@ resource "aws_ecs_service" "frontend" {
   deployment_maximum_percent         = 200
 
   tags = var.tags
+
+  # No se especifica launch_type ni capacity_provider_strategy: el servicio
+  # usa la estrategia por defecto del cluster (ver default_capacity_provider_strategy
+  # en modules/ecs-cluster). AWS aplica esa estrategia al servicio del lado
+  # del API, y Terraform la lee de vuelta al refrescar el estado. Como el
+  # atributo no esta en este bloque, cada plan la ve como "hay que sacarla" -
+  # y al ser capacity_provider_strategy un atributo ForceNew, eso dispara un
+  # destroy+create del servicio en cada apply. Se ignora explicitamente para
+  # que Terraform no la trate como drift.
+  lifecycle {
+    ignore_changes = [capacity_provider_strategy]
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -294,6 +306,11 @@ resource "aws_ecs_service" "mysql" {
   deployment_maximum_percent         = 100
 
   tags = var.tags
+
+  # Mismo motivo que en el servicio frontend: ver el comentario de arriba.
+  lifecycle {
+    ignore_changes = [capacity_provider_strategy]
+  }
 }
 
 data "aws_region" "current" {}
