@@ -27,6 +27,17 @@ output "codestar_connection_status" {
   value = module.cicd.codestar_connection_status
 }
 
-output "dashboard_name" {
-  value = module.observability.dashboard_name
+output "dashboard_negocio_url" {
+  description = "Dashboard de nivel de servicio (SLI/SLO) - vision de negocio"
+  value       = module.observability.dashboard_negocio_url
+}
+
+output "dashboard_operaciones_url" {
+  description = "Dashboard de diagnostico - capacidad, recursos y persistencia"
+  value       = module.observability.dashboard_operaciones_url
+}
+
+output "alarmas" {
+  description = "Alarmas creadas, agrupadas por capa"
+  value       = module.observability.alarm_names
 }

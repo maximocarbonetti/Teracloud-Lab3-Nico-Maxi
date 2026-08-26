@@ -222,6 +222,14 @@ data "aws_iam_policy_document" "codepipeline_policy" {
       values   = ["ecs-tasks.amazonaws.com"]
     }
   }
+
+  # La etapa de aprobacion manual publica el aviso en SNS con la identidad del
+  # propio pipeline, asi que su rol necesita permiso explicito para hacerlo.
+  statement {
+    effect    = "Allow"
+    actions   = ["sns:Publish"]
+    resources = [var.sns_topic_arn]
+  }
 }
 
 resource "aws_iam_role_policy" "codepipeline" {
@@ -281,6 +289,33 @@ resource "aws_codepipeline" "this" {
     }
   }
 
+  # Compuerta de aprobacion manual antes de tocar el entorno.
+  #
+  # La imagen ya esta construida y publicada en ECR en este punto: lo unico que
+  # queda pendiente es actualizar el servicio ECS. Frenar aca permite revisar el
+  # build, decidir el momento del despliegue y dejar registrado quien lo aprobo.
+  dynamic "stage" {
+    for_each = var.enable_manual_approval ? [1] : []
+
+    content {
+      name = "Approval"
+
+      action {
+        name     = "AprobacionManual"
+        category = "Approval"
+        owner    = "AWS"
+        provider = "Manual"
+        version  = "1"
+
+        configuration = {
+          NotificationArn    = var.sns_topic_arn
+          CustomData         = "Revisar el build antes de desplegar en ${var.ecs_cluster_name}. La imagen ya esta en ECR; aprobar actualiza el servicio ${var.ecs_service_name}."
+          ExternalEntityLink = var.approval_review_url
+        }
+      }
+    }
+  }
+
   stage {
     name = "Deploy"
 
@@ -314,6 +349,11 @@ resource "aws_codestarnotifications_notification_rule" "pipeline" {
   event_type_ids = [
     "codepipeline-pipeline-pipeline-execution-succeeded",
     "codepipeline-pipeline-pipeline-execution-failed",
+    # Avisa que hay un despliegue esperando aprobacion, para que la compuerta
+    # manual no dependa de que alguien mire la consola por casualidad.
+    "codepipeline-pipeline-manual-approval-needed",
+    "codepipeline-pipeline-manual-approval-succeeded",
+    "codepipeline-pipeline-manual-approval-failed",
   ]
 
   target {

@@ -116,6 +116,7 @@ module "ecs_service" {
 
   frontend_image            = "${module.ecr.repository_url}:${var.frontend_image_tag}"
   frontend_target_group_arn = module.alb.frontend_target_group_arn
+  frontend_desired_count    = var.frontend_desired_count
 
   frontend_secrets = {
     DB_HOST     = module.ssm_parameters.db_host_arn
@@ -158,11 +159,18 @@ module "observability" {
   name_prefix            = local.name_prefix
   cluster_name           = module.ecs_cluster.cluster_name
   frontend_service_name  = module.ecs_service.frontend_service_name
+  frontend_desired_count = var.frontend_desired_count
   mysql_service_name     = module.ecs_service.mysql_service_name
   alb_arn                = module.alb.alb_arn
   target_group_arn       = module.alb.frontend_target_group_arn
+  efs_file_system_id     = module.efs.file_system_id
   sns_topic_arn          = module.notifications.topic_arn
-  tags                   = local.common_tags
+
+  # Objetivos de nivel de servicio del entorno
+  slo_error_rate_pct      = var.slo_error_rate_pct
+  slo_latency_p99_seconds = var.slo_latency_p99_seconds
+
+  tags = local.common_tags
 }
 
 module "cicd" {
@@ -177,5 +185,10 @@ module "cicd" {
   ecs_service_name      = module.ecs_service.frontend_service_name
   container_name        = "frontend"
   sns_topic_arn         = module.notifications.topic_arn
-  tags                  = local.common_tags
+
+  # Compuerta de aprobacion manual antes del deploy
+  enable_manual_approval = var.enable_manual_approval
+  approval_review_url    = "https://${var.app_record_name}/"
+
+  tags = local.common_tags
 }
