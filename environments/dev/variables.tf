@@ -144,9 +144,9 @@ variable "notification_emails" {
 }
 
 variable "enable_manual_approval" {
-  description = "Exigir aprobacion manual entre el build y el despliegue al servicio ECS"
+  description = "Exigir aprobacion manual entre el build y el despliegue al servicio ECS. Desactivada en dev."
   type        = bool
-  default     = true
+  default     = false
 }
 
 # ---- Objetivos de nivel de servicio (SLO) ----

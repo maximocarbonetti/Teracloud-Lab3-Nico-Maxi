@@ -62,9 +62,13 @@ variable "enable_manual_approval" {
     rechace desde la consola de CodePipeline. La imagen ya esta publicada en ECR
     en ese punto: lo unico que la aprobacion controla es el momento en que se
     actualiza el servicio ECS.
+
+    Desactivada en este entorno: el despliegue a dev es automatico de punta a
+    punta. Se deja implementada para poder activarla con un booleano en un
+    entorno productivo, donde el control del momento del despliegue si importa.
   EOT
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "approval_review_url" {

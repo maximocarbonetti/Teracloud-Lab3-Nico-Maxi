@@ -37,7 +37,7 @@ github_repository_id = "maximocarbonetti/Teracloud-Lab3-app-Nico-Maxi"
 github_branch        = "main"
 
 # Compuerta de aprobacion manual entre el build y el despliegue a ECS
-enable_manual_approval = true
+enable_manual_approval = false
 
 # ---- Notificaciones ----
 # Cada direccion recibe un mail de confirmacion de SNS que hay que aceptar;
