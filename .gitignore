@@ -10,3 +10,4 @@ override.tf.json
 # Nota: .terraform.lock.hcl NO se ignora a proposito. Hashicorp recomienda
 # versionarlo para que todos (y el CI) resuelvan exactamente las mismas
 # versiones de providers — es parte de que el repo sea reproducible.
+lab3-app/
